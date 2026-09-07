@@ -1,0 +1,66 @@
+# HireGrid — local development infrastructure
+#
+# Runs only the stateful services (PostgreSQL and Redis). The API and the web
+# client run on the host with `npm run dev` so that hot reload, breakpoints and
+# stack traces work normally — containerising them during development buys
+# nothing and costs a rebuild on every file change.
+#
+#   docker compose up -d      start in the background
+#   docker compose ps         check both are healthy
+#   docker compose down       stop (data is kept in the named volumes)
+#   docker compose down -v    stop and DELETE all data
+#
+# Note: no top-level `version:` key. It was deprecated in Compose v2 and now
+# only produces a warning.
+
+name: hiregrid
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: hiregrid-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hiregrid
+      POSTGRES_PASSWORD: hiregrid_dev_password
+      POSTGRES_DB: hiregrid
+    ports:
+      # host:container — the API connects from the host, not from inside the
+      # Docker network, so this port must be published.
+      - '5432:5432'
+    volumes:
+      # Named volume, so `docker compose down` (without -v) keeps the data and
+      # migrations do not have to be re-run every time Docker restarts.
+      - hiregrid_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # `docker compose ps` reports "healthy" only once Postgres actually
+      # accepts connections. The container being "up" happens several seconds
+      # earlier, which is long enough for a migration run to fail confusingly.
+      test: ['CMD-SHELL', 'pg_isready -U hiregrid -d hiregrid']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7
+    container_name: hiregrid-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - hiregrid_redis_data:/data
+    # appendonly yes turns on Redis persistence. It matters here because Redis
+    # is not only a cache: it is also the BullMQ job store. Without it, a Redis
+    # restart would silently drop queued AI-analysis jobs.
+    command: ['redis-server', '--appendonly', 'yes']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  hiregrid_postgres_data:
+  hiregrid_redis_data:

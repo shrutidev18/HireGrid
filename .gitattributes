@@ -1,0 +1,21 @@
+# Normalise line endings across machines.
+#
+# Without this, Git records whatever the author's OS used, and a file edited on
+# Windows then on macOS shows every line as changed in the diff. `eol=lf` stores
+# and checks out LF everywhere; Node, Vite and VS Code all handle LF on Windows
+# without complaint.
+* text=auto eol=lf
+
+# Files that must never be line-ending converted.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.woff binary
+*.woff2 binary
+
+# Generated lockfiles: keep them in the repo, but collapse them in diffs and
+# mark them as not-authored-by-hand in GitHub's language statistics.
+package-lock.json -diff linguist-generated
