@@ -1,0 +1,14 @@
+// HireGrid — Prisma schema
+//
+// Phase 0 sets up the Prisma toolchain and the PostgreSQL connection only.
+// No models and no migrations yet; the data model (User, Application,
+// StatusHistory, Resume, AnalysisResult, Profile) arrives in Phase 1.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
