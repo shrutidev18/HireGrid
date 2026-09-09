@@ -1,0 +1,12 @@
+{
+  /**
+   * Build-only config.
+   *
+   * `tsconfig.json` type-checks everything including tests, so `npm run
+   * typecheck` catches mistakes in test files too. This one is used by
+   * `npm run build` and additionally excludes the tests, so `dist/` contains
+   * only what actually ships — no test files, no Jest types.
+   */
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "dist", "src/__tests__", "src/**/*.test.ts"]
+}
