@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 
 import App from './App';
+import { AuthProvider } from './context/AuthContext';
 import './index.css';
 
 /**
@@ -14,17 +15,15 @@ import './index.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Refetching every time the user tabs back to the window is noisy for a
-      // tracker whose data changes when *they* change it. Individual queries
-      // that genuinely need it (the analysis poller) opt back in.
+      // Refetching every time the user tabs back is noisy for a tracker whose
+      // data changes when *they* change it. Queries that genuinely need it
+      // (the analysis poller) opt back in.
       refetchOnWindowFocus: false,
 
       // One retry: enough to ride out a blip, not enough to make a genuinely
       // broken request take ten seconds to report failure.
       retry: 1,
 
-      // Data is considered fresh for 30s, so navigating back to a page the
-      // user just visited reads from cache instead of refetching.
       staleTime: 30_000,
     },
   },
@@ -37,11 +36,19 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    {/* Provider order matters: BrowserRouter must be inside QueryClientProvider
-        so route components can use query hooks. */}
+    {/*
+      Provider order matters, outermost first:
+        QueryClientProvider — AuthProvider is built on React Query, so the
+                              client must exist before it mounts.
+        BrowserRouter       — AuthProvider's consumers navigate, and
+                              ProtectedRoute needs the router's location.
+        AuthProvider        — supplies the session to everything in App.
+    */}
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <App />
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,
