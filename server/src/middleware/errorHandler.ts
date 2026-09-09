@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { AppError } from '../utils/AppError';
-import { isProduction } from '../config/env';
+import { isDevelopment } from '../config/env';
 
 /**
  * The exact response body every failed request returns, without exception.
@@ -68,9 +68,11 @@ export function errorHandler(
   const logPrefix = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} -> ${statusCode}`;
   if (statusCode >= 500) {
     console.error(logPrefix, err);
-  } else if (!isProduction) {
+  } else if (isDevelopment) {
     // 4xx responses are the client's fault, not a server fault — log them
-    // compactly in development for debugging, and not at all in production.
+    // compactly in development for debugging. Not in production (noise), and
+    // not under test, where deliberately provoking 4xxs is the point and the
+    // logging would bury the actual test results.
     console.warn(`${logPrefix} ${message}`);
   }
 
