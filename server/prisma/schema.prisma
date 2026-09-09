@@ -1,8 +1,18 @@
 // HireGrid — Prisma schema
 //
-// Phase 0 sets up the Prisma toolchain and the PostgreSQL connection only.
-// No models and no migrations yet; the data model (User, Application,
-// StatusHistory, Resume, AnalysisResult, Profile) arrives in Phase 1.
+// Six models covering the whole product:
+//   User            → the account
+//   Profile         → the user's career details (1:1 with User)
+//   Resume          → an uploaded resume plus its extracted text
+//   Application     → one job application
+//   StatusHistory   → an append-only log of every status change
+//   AnalysisResult  → the AI's analysis of one application (1:1)
+//
+// Two rules run through the whole file:
+//   1. Every row that belongs to a user is reachable from `userId`, so every
+//      query in the API can be scoped to the requesting user.
+//   2. Deleting a user removes everything they own, and deleting an
+//      application removes everything that only exists to describe it.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,4 +21,261 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+//
+// These are real PostgreSQL enum types, not free-text columns. The database
+// itself rejects a status that is not in the list, so a typo in application
+// code fails at write time instead of quietly producing a row that no filter
+// will ever match.
+// ---------------------------------------------------------------------------
+
+enum ExperienceLevel {
+  STUDENT
+  FRESHER
+  EXPERIENCED
+}
+
+enum EmploymentType {
+  INTERNSHIP
+  FULL_TIME
+}
+
+enum WorkMode {
+  REMOTE
+  HYBRID
+  ONSITE
+}
+
+/// The application pipeline. REJECTED is reachable from any stage rather than
+/// being the end of a linear sequence, which is why this is a flat enum and
+/// not an ordered integer.
+enum ApplicationStatus {
+  SAVED
+  APPLIED
+  ONLINE_ASSESSMENT
+  TECH_INTERVIEW
+  HR_INTERVIEW
+  OFFER
+  REJECTED
+}
+
+/// Lifecycle of one background AI analysis job.
+/// PENDING is the default because the row is created the moment the job is
+/// enqueued — before the worker has run — so the client has something to poll.
+enum AnalysisStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+model User {
+  id String @id @default(uuid())
+
+  /// Unique, so the database enforces "one account per email" even if two
+  /// signup requests race past the application-level check at the same moment.
+  email String @unique
+
+  /// Only ever a bcrypt hash. The plaintext password is never stored, and the
+  /// field name says so at every call site.
+  passwordHash String
+
+  name String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations. Cascade is declared on the child side of each.
+  profile      Profile?
+  resumes      Resume[]
+  applications Application[]
+}
+
+model Profile {
+  id String @id @default(uuid())
+
+  /// @unique is what makes this a one-to-one rather than one-to-many: the
+  /// database will not accept a second profile row for the same user.
+  userId String @unique
+
+  targetRole String?
+
+  /// A native PostgreSQL text[] column. A separate Skill table would allow
+  /// renaming a skill everywhere at once, but these are free-text strings the
+  /// user types, never shared entities, so the join table would add work
+  /// without adding meaning.
+  skills String[] @default([])
+
+  education       String?
+  experienceLevel ExperienceLevel?
+  graduationYear  Int?
+  phone           String?
+  linkedinUrl     String?
+  portfolioUrl    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Resume {
+  id     String @id @default(uuid())
+  userId String
+
+  /// The original name the user uploaded, shown in the UI.
+  fileName String
+
+  /// Where the stored file lives. A local path for now; if storage moves to S3
+  /// later, only the value changes, not the schema.
+  fileUrl String
+
+  /// Text pulled out of the PDF/DOCX at upload time by pdf-parse or mammoth.
+  /// Extracted once and stored, so the AI analysis never has to re-parse the
+  /// file — and so the same resume can be compared against many job
+  /// descriptions cheaply.
+  /// @db.Text because a resume easily exceeds the ~255 char default varchar.
+  extractedText String @db.Text
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// One resume can be attached to many applications — reusing a resume across
+  /// applications is a core requirement.
+  applications Application[]
+
+  /// "List my resumes" filters on userId on every profile and upload page.
+  /// PostgreSQL does not create an index for a foreign key automatically, so
+  /// without this every such query is a sequential scan.
+  @@index([userId])
+}
+
+model Application {
+  id     String @id @default(uuid())
+  userId String
+
+  companyName    String
+  jobTitle       String
+  jobLocation    String
+  employmentType EmploymentType
+
+  /// Optional: not every posting states remote/hybrid/onsite.
+  workMode WorkMode?
+
+  jobLink String?
+
+  /// The pasted job description — the other half of the AI comparison.
+  jobDescription String @db.Text
+
+  /// Optional, and SetNull on delete: an application can exist before a resume
+  /// is attached (status SAVED), and must survive a resume being deleted.
+  /// The business rule "block deleting a resume that an active application
+  /// uses" is enforced in the service layer, where "active" can actually be
+  /// defined; the database keeps the fallback non-destructive.
+  resumeId String?
+
+  status      ApplicationStatus @default(SAVED)
+  dateApplied DateTime?
+
+  /// Free text, not a number: real postings say "8-12 LPA", "Competitive",
+  /// "₹45,000/month". Forcing a numeric type would mean discarding what the
+  /// posting actually said.
+  salary String?
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume Resume? @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+
+  statusHistory  StatusHistory[]
+  analysisResult AnalysisResult?
+
+  /// Indexes chosen from the queries the app actually runs:
+  ///   [userId]           — every list, because all data is user-scoped
+  ///   [status]           — the dashboard's funnel counts
+  ///   [dateApplied]      — sorting the table by date, and the match-score trend
+  ///   [userId, status]   — the composite that serves the most common query of
+  ///                        all ("this user's applications at this stage").
+  ///                        A composite index is not redundant with the two
+  ///                        single-column ones: PostgreSQL can satisfy the
+  ///                        pair from one index scan instead of combining two.
+  ///   [resumeId]         — the "is this resume still in use?" check that runs
+  ///                        before every resume deletion.
+  @@index([userId])
+  @@index([status])
+  @@index([dateApplied])
+  @@index([userId, status])
+  @@index([resumeId])
+}
+
+/// An append-only audit log. A status change inserts a row here; it never
+/// updates an existing one. That is the whole point — Application.status holds
+/// where the application is *now*, and this table holds how it got there, which
+/// is what the timeline and the "stuck for 10+ days" report are built from.
+model StatusHistory {
+  id            String @id @default(uuid())
+  applicationId String
+
+  status    ApplicationStatus
+  changedAt DateTime          @default(now())
+
+  /// Optional free-text note recorded with the change ("recruiter said results
+  /// in 2 weeks").
+  note String?
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  /// Composite index matching the only query this table serves: fetch one
+  /// application's history in chronological order. Ordering by an indexed
+  /// column lets PostgreSQL skip the sort entirely.
+  @@index([applicationId, changedAt])
+}
+
+/// The result of one AI analysis, one row per application.
+///
+/// The row is created in PENDING state at the moment the job is enqueued, so
+/// the client has something to poll immediately. The worker later fills in the
+/// arrays and flips status to COMPLETED, or to FAILED if the AI call failed —
+/// a failure is recorded, never left as an eternal PENDING.
+model AnalysisResult {
+  id String @id @default(uuid())
+
+  /// @unique enforces one analysis per application at the database level.
+  applicationId String @unique
+
+  status AnalysisStatus @default(PENDING)
+
+  /// All array fields default to [] rather than being nullable, so consuming
+  /// code can always map over them without a null check. An analysis that
+  /// found nothing and an analysis that has not run yet are distinguished by
+  /// `status`, not by null vs empty.
+  requiredSkills  String[] @default([])
+  preferredSkills String[] @default([])
+  matchedSkills   String[] @default([])
+  missingSkills   String[] @default([])
+
+  /// 0-100. Nullable because it is genuinely unknown until the job completes;
+  /// defaulting it to 0 would make a pending analysis look like a terrible
+  /// match and would poison the dashboard's average.
+  matchScore Int?
+
+  atsKeywordsPresent String[] @default([])
+  atsKeywordsMissing String[] @default([])
+  suggestions        String[] @default([])
+
+  /// The model's natural-language explanation of why each missing skill
+  /// matters for this specific role.
+  reasoning String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 }
