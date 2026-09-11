@@ -58,3 +58,22 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
   req.userId = payload.userId;
   next();
 }
+
+/**
+ * Reads the authenticated user's id from a request.
+ *
+ * `req.userId` is typed as optional because it genuinely is absent on public
+ * routes, which means every protected controller would otherwise need its own
+ * `if (!req.userId)` guard before it could pass the value to a service.
+ *
+ * This centralises that guard. On a route mounted behind `requireAuth` the
+ * throw is unreachable; if someone later mounts a controller *without* the
+ * middleware, it fails closed with a 401 rather than passing `undefined` into
+ * a query — which would otherwise scope that query to no user at all.
+ */
+export function getUserId(req: Request): string {
+  if (!req.userId) {
+    throw new AppError('Unauthorized', 401);
+  }
+  return req.userId;
+}

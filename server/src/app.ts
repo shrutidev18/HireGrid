@@ -6,6 +6,7 @@ import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import healthRoutes from './routes/health.routes';
 import authRoutes from './routes/auth.routes';
+import applicationRoutes from './routes/applications.routes';
 
 /**
  * Builds the configured Express app, without starting a server.
@@ -47,6 +48,7 @@ app.use(cookieParser());
 //    authentication; everything added from here on sits behind requireAuth.
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/applications', applicationRoutes);
 
 // 5. Nothing matched — turn it into a 404 that flows through the error handler.
 app.use(notFoundHandler);
