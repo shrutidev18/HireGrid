@@ -8,23 +8,38 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Applications from './pages/Applications';
+import AddApplication from './pages/AddApplication';
+import ApplicationDetails from './pages/ApplicationDetails';
+import EditApplication from './pages/EditApplication';
 import Profile from './pages/Profile';
 import HealthCheckPage from './pages/HealthCheckPage';
 
 /**
+ * Wraps a page in the auth gate and the shared chrome.
+ *
+ * Introduced once there were six protected routes: writing both wrappers out
+ * per route made the table hard to read, and — more importantly — made it easy
+ * to add a route and forget one of them. Now "protected" is a single word on
+ * the line that declares the route, and there is no partial version of it.
+ */
+function protectedPage(element: React.ReactNode) {
+  return (
+    <ProtectedRoute>
+      <AppLayout>{element}</AppLayout>
+    </ProtectedRoute>
+  );
+}
+
+/**
  * Route table.
  *
- * Three tiers:
- *   - Guest-only: login and signup, which redirect away if already signed in.
- *   - Protected:  everything that shows a user's own data. Each is wrapped in
- *                 ProtectedRoute *and* AppLayout, so a page cannot accidentally
- *                 be added without its auth gate.
- *   - Public:     the Phase 0 connectivity check, kept as a debugging aid.
+ * Three tiers: guest-only (login, signup), protected (everything showing a
+ * user's own data), and public (the Phase 0 connectivity check).
  *
- * The wrapping is repeated per route rather than applied to a parent layout
- * route, because it keeps each route's protection visible on the line that
- * declares it — there is no way to read this file and be unsure whether a page
- * requires a session.
+ * Route order: `/applications/new` is declared before `/applications/:id` for
+ * readability. React Router v7 ranks by specificity rather than declaration
+ * order, so a static segment already beats a dynamic one — but the ordering
+ * makes the intent obvious to a reader who does not know that.
  */
 export default function App() {
   return (
@@ -48,36 +63,12 @@ export default function App() {
       />
 
       {/* Protected */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Dashboard />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/applications"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Applications />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Profile />
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/dashboard" element={protectedPage(<Dashboard />)} />
+      <Route path="/applications" element={protectedPage(<Applications />)} />
+      <Route path="/applications/new" element={protectedPage(<AddApplication />)} />
+      <Route path="/applications/:id" element={protectedPage(<ApplicationDetails />)} />
+      <Route path="/applications/:id/edit" element={protectedPage(<EditApplication />)} />
+      <Route path="/profile" element={protectedPage(<Profile />)} />
 
       {/* Public — kept from Phase 0 for checking API connectivity. */}
       <Route path="/health-check" element={<HealthCheckPage />} />
