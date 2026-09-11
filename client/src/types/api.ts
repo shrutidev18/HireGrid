@@ -11,13 +11,15 @@ export interface HealthResponse {
   status: 'ok';
 }
 
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
 /**
  * The only user shape the API ever returns.
  *
  * Note there is no `password` or `passwordHash` field — not because they are
- * omitted here, but because the server never sends them. If one ever appeared
- * in a response, this type would make it invisible to the app rather than
- * silently available.
+ * omitted here, but because the server never sends them.
  */
 export interface User {
   id: string;
@@ -25,20 +27,181 @@ export interface User {
   email: string;
 }
 
-/** Response of signup, login and /me. */
 export interface AuthResponse {
   user: User;
 }
 
-/** POST /api/auth/signup */
 export interface SignupPayload {
   name: string;
   email: string;
   password: string;
 }
 
-/** POST /api/auth/login */
 export interface LoginPayload {
   email: string;
   password: string;
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+//
+// Mirrors of the PostgreSQL enums in prisma/schema.prisma. The API sends and
+// accepts the raw values (`ONLINE_ASSESSMENT`); the label maps below exist so
+// no component has to build a human-readable string from one, and so changing
+// the wording happens in one place.
+// ---------------------------------------------------------------------------
+
+export const APPLICATION_STATUSES = [
+  'SAVED',
+  'APPLIED',
+  'ONLINE_ASSESSMENT',
+  'TECH_INTERVIEW',
+  'HR_INTERVIEW',
+  'OFFER',
+  'REJECTED',
+] as const;
+
+export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
+
+/**
+ * The stages an application moves *through*, in order.
+ *
+ * REJECTED is deliberately not in this list. It can happen at any point and is
+ * an exit from the pipeline, not a position along it — forcing it into a
+ * linear stepper would imply it comes after OFFER, which is nonsense. The UI
+ * renders it as a separate branch.
+ */
+export const PIPELINE_STAGES = [
+  'SAVED',
+  'APPLIED',
+  'ONLINE_ASSESSMENT',
+  'TECH_INTERVIEW',
+  'HR_INTERVIEW',
+  'OFFER',
+] as const;
+
+export type PipelineStage = (typeof PIPELINE_STAGES)[number];
+
+export const STATUS_LABELS: Record<ApplicationStatus, string> = {
+  SAVED: 'Saved',
+  APPLIED: 'Applied',
+  ONLINE_ASSESSMENT: 'Online Assessment',
+  TECH_INTERVIEW: 'Tech Interview',
+  HR_INTERVIEW: 'HR Interview',
+  OFFER: 'Offer',
+  REJECTED: 'Rejected',
+};
+
+export const EMPLOYMENT_TYPES = ['INTERNSHIP', 'FULL_TIME'] as const;
+export type EmploymentType = (typeof EMPLOYMENT_TYPES)[number];
+
+export const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = {
+  INTERNSHIP: 'Internship',
+  FULL_TIME: 'Full-time',
+};
+
+export const WORK_MODES = ['REMOTE', 'HYBRID', 'ONSITE'] as const;
+export type WorkMode = (typeof WORK_MODES)[number];
+
+export const WORK_MODE_LABELS: Record<WorkMode, string> = {
+  REMOTE: 'Remote',
+  HYBRID: 'Hybrid',
+  ONSITE: 'Onsite',
+};
+
+export type AnalysisStatus = 'PENDING' | 'COMPLETED' | 'FAILED';
+
+// ---------------------------------------------------------------------------
+// Applications
+// ---------------------------------------------------------------------------
+
+/**
+ * One entry in an application's history.
+ *
+ * Dates arrive as ISO strings: JSON has no date type, so anything that was a
+ * `DateTime` in Prisma is a string by the time it reaches here. Components
+ * parse it with `new Date(...)` at the point of display.
+ */
+export interface StatusHistoryEntry {
+  id: string;
+  applicationId: string;
+  status: ApplicationStatus;
+  changedAt: string;
+  note: string | null;
+}
+
+/** Summary of an AI analysis. Filled in from Phase 5 onward. */
+export interface AnalysisSummary {
+  status: AnalysisStatus;
+  matchScore: number | null;
+}
+
+/** The resume attached to an application, when there is one. */
+export interface ResumeRef {
+  id: string;
+  fileName: string;
+}
+
+/** A row in the applications list — deliberately lighter than the full record. */
+export interface ApplicationListItem {
+  id: string;
+  companyName: string;
+  jobTitle: string;
+  jobLocation: string;
+  employmentType: EmploymentType;
+  workMode: WorkMode | null;
+  status: ApplicationStatus;
+  dateApplied: string | null;
+  salary: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resume: ResumeRef | null;
+  analysisResult: AnalysisSummary | null;
+}
+
+/** GET /api/applications/:id — the full record with its relations. */
+export interface Application extends ApplicationListItem {
+  jobLink: string | null;
+  jobDescription: string;
+  notes: string | null;
+  resumeId: string | null;
+  statusHistory: StatusHistoryEntry[];
+  analysisResult: AnalysisSummary | null;
+}
+
+/** Body for POST /api/applications. */
+export interface CreateApplicationPayload {
+  companyName: string;
+  jobTitle: string;
+  jobLocation: string;
+  employmentType: EmploymentType;
+  workMode?: WorkMode | null;
+  jobLink?: string | null;
+  jobDescription: string;
+  resumeId?: string | null;
+  dateApplied?: string | null;
+  salary?: string | null;
+  notes?: string | null;
+  status?: ApplicationStatus;
+}
+
+/**
+ * Body for PUT /api/applications/:id.
+ *
+ * Every field optional, and `status` is absent entirely — it is not editable
+ * through this endpoint, because a status change must also write a history
+ * row. That is what `updateStatus` is for.
+ */
+export type UpdateApplicationPayload = Partial<Omit<CreateApplicationPayload, 'status'>>;
+
+/** Body for PATCH /api/applications/:id/status. */
+export interface UpdateStatusPayload {
+  status: ApplicationStatus;
+  note?: string | null;
+}
+
+/** Response of PATCH /api/applications/:id/status. */
+export interface UpdateStatusResponse {
+  application: Application;
+  statusHistory: StatusHistoryEntry;
 }
