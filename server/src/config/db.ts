@@ -40,6 +40,22 @@ if (!isProduction) {
 }
 
 /**
+ * The client handed to an interactive transaction callback
+ * (`prisma.$transaction(async (tx) => ...)`).
+ *
+ * It is the full client minus the methods that make no sense inside an open
+ * transaction — you cannot disconnect, or start a nested transaction, from
+ * within one. Prisma models this as `Prisma.TransactionClient`; the type is
+ * re-derived here so that services can annotate their `tx` parameter without
+ * importing the Prisma namespace, which is only present after
+ * `prisma generate` has run.
+ */
+export type TransactionClient = Omit<
+  typeof prisma,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
+
+/**
  * Closes the connection pool. Called from the server's shutdown handler so
  * PostgreSQL is not left holding connections from a process that has exited.
  */
