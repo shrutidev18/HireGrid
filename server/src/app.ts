@@ -7,6 +7,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import healthRoutes from './routes/health.routes';
 import authRoutes from './routes/auth.routes';
 import applicationRoutes from './routes/applications.routes';
+import resumeRoutes from './routes/resumes.routes';
 
 /**
  * Builds the configured Express app, without starting a server.
@@ -49,6 +50,7 @@ app.use(cookieParser());
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/applications', applicationRoutes);
+app.use('/api/resumes', resumeRoutes);
 
 // 5. Nothing matched — turn it into a 404 that flows through the error handler.
 app.use(notFoundHandler);

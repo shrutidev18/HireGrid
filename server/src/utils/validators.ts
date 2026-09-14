@@ -239,3 +239,8 @@ export type UpdateStatusInput = z.infer<typeof updateStatusSchema>;
 export const idParamSchema = z.object({
   id: z.uuid({ error: 'Invalid application id' }),
 });
+
+/** Route parameter for resume endpoints. */
+export const resumeIdParamSchema = z.object({
+  id: z.uuid({ error: 'Invalid resume id' }),
+});
