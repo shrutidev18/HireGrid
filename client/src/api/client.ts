@@ -23,9 +23,16 @@ export const apiClient = axios.create({
    */
   withCredentials: true,
 
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  /**
+   * No default Content-Type is set on purpose.
+   *
+   * Axios already picks the right one from the payload: `application/json` for
+   * a plain object, and `multipart/form-data` **with the boundary parameter**
+   * for a FormData body. Hard-coding `application/json` here broke resume
+   * uploads — the browser sent a multipart body labelled as JSON, and Multer
+   * had no boundary to split it on. Setting `multipart/form-data` by hand does
+   * not help either, because only the browser knows the boundary it generated.
+   */
 
   // A request that hangs forever leaves the UI stuck in a loading state with
   // no way out. Failing after 15s at least produces an error to render.

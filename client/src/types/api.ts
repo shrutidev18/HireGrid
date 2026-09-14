@@ -205,3 +205,38 @@ export interface UpdateStatusResponse {
   application: Application;
   statusHistory: StatusHistoryEntry;
 }
+
+// ---------------------------------------------------------------------------
+// Resumes
+// ---------------------------------------------------------------------------
+
+/**
+ * A resume as the API returns it.
+ *
+ * There is no `extractedText` field — the server never sends it. It can be
+ * tens of kilobytes, no screen displays it, and it exists only so the AI
+ * analysis can read it server-side.
+ */
+export interface Resume {
+  id: string;
+  fileName: string;
+  createdAt: string;
+}
+
+/** An application that uses a given resume, as shown on the resume page. */
+export interface ResumeApplicationRef {
+  id: string;
+  companyName: string;
+  jobTitle: string;
+}
+
+/** GET /api/resumes/:id — the resume plus what is using it. */
+export interface ResumeWithApplications extends Resume {
+  applications: ResumeApplicationRef[];
+}
+
+/** Accepted upload formats, mirrored from the server's Multer configuration. */
+export const ACCEPTED_RESUME_EXTENSIONS = ['.pdf', '.docx'] as const;
+
+/** 5 MB, matching MAX_UPLOAD_BYTES on the server. */
+export const MAX_RESUME_BYTES = 5 * 1024 * 1024;
