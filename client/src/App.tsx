@@ -11,6 +11,7 @@ import Applications from './pages/Applications';
 import AddApplication from './pages/AddApplication';
 import ApplicationDetails from './pages/ApplicationDetails';
 import EditApplication from './pages/EditApplication';
+import MyResumes from './pages/MyResumes';
 import Profile from './pages/Profile';
 import HealthCheckPage from './pages/HealthCheckPage';
 
@@ -68,6 +69,7 @@ export default function App() {
       <Route path="/applications/new" element={protectedPage(<AddApplication />)} />
       <Route path="/applications/:id" element={protectedPage(<ApplicationDetails />)} />
       <Route path="/applications/:id/edit" element={protectedPage(<EditApplication />)} />
+      <Route path="/resumes" element={protectedPage(<MyResumes />)} />
       <Route path="/profile" element={protectedPage(<Profile />)} />
 
       {/* Public — kept from Phase 0 for checking API connectivity. */}

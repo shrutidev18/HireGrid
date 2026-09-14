@@ -11,6 +11,8 @@ import {
   type CreateApplicationPayload,
 } from '../types/api';
 import { toDateInputValue } from '../utils/format';
+import { useResumesList } from '../hooks/useResumes';
+import ResumeUpload from './ResumeUpload';
 
 /**
  * The form used to both create and edit an application.
@@ -143,6 +145,17 @@ export default function ApplicationForm({
   const isEdit = Boolean(application);
   const [values, setValues] = useState<FormValues>(() => initialFormValues(application));
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  /**
+   * The resume dropdown is populated from the user's uploads.
+   *
+   * Fetched by the form itself rather than passed in as a prop: React Query
+   * dedupes and caches the request, so a component asking for what it needs
+   * costs nothing extra and keeps the parent pages from threading data they do
+   * not otherwise use.
+   */
+  const { data: resumes, isPending: resumesLoading } = useResumesList();
+  const [showUploader, setShowUploader] = useState(false);
 
   function set<K extends keyof FormValues>(key: K, value: string) {
     setValues((previous) => ({ ...previous, [key]: value }));
@@ -367,15 +380,51 @@ export default function ApplicationForm({
             <label htmlFor="resumeId" className="mb-1.5 block text-sm font-medium text-slate-700">
               Resume used
             </label>
-            {/* Disabled until resume upload exists. Shown rather than hidden so
-                the form's final shape is visible now, and so it is obvious
-                that the field is coming rather than missing. */}
-            <select id="resumeId" disabled className={`${fieldClass(false)} bg-slate-50`}>
-              <option>No resumes uploaded yet</option>
+            <select
+              id="resumeId"
+              value={values.resumeId}
+              onChange={(event) => set('resumeId', event.target.value)}
+              disabled={resumesLoading}
+              className={fieldClass(false)}
+            >
+              <option value="">
+                {resumesLoading
+                  ? 'Loading…'
+                  : resumes && resumes.length > 0
+                    ? 'None selected'
+                    : 'No resumes uploaded yet'}
+              </option>
+              {resumes?.map((resume) => (
+                <option key={resume.id} value={resume.id}>
+                  {resume.fileName}
+                </option>
+              ))}
             </select>
-            <p className="mt-1 text-xs text-slate-500">Resume upload arrives in a later phase.</p>
+
+            <button
+              type="button"
+              onClick={() => setShowUploader((open) => !open)}
+              className="mt-1 text-xs font-medium text-brand-600 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+            >
+              {showUploader ? 'Cancel upload' : 'Upload a new resume'}
+            </button>
           </div>
         </div>
+
+        {/* Inline upload, so adding a resume does not mean abandoning a
+            half-filled form. On success the new resume is selected
+            immediately — which is the only reason anyone opened this. */}
+        {showUploader && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <ResumeUpload
+              compact
+              onUploaded={(resume) => {
+                set('resumeId', resume.id);
+                setShowUploader(false);
+              }}
+            />
+          </div>
+        )}
 
         <div className="mt-4">
           <label htmlFor="notes" className="mb-1.5 block text-sm font-medium text-slate-700">
