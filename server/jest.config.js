@@ -1,4 +1,19 @@
-/** @type {import('ts-jest').JestConfigWithTsJest} */
+/**
+ * Note on how the tests are launched.
+ *
+ * `npm test` runs Jest through `node --experimental-vm-modules` rather than
+ * calling the `jest` binary directly. The reason is pdf.js, which pdf-parse
+ * depends on: it loads its worker with a dynamic `import()`, and Jest's
+ * CommonJS VM refuses that with "A dynamic import callback was invoked without
+ * --experimental-vm-modules". Without the flag, every test that parses a real
+ * PDF fails.
+ *
+ * Invoking node with the flag (instead of setting NODE_OPTIONS) keeps the
+ * script working identically in PowerShell, cmd and bash — `NODE_OPTIONS=...`
+ * prefixing is a Unix shell idiom that Windows does not understand.
+ *
+ * @type {import('ts-jest').JestConfigWithTsJest}
+ */
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
