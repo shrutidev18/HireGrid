@@ -5,9 +5,11 @@ has sent in one place, and uses AI to analyse how well a resume matches a given
 job description — producing a match score, the skills that are missing, ATS
 keyword gaps, and concrete suggestions for tailoring the resume.
 
-> **Status:** Phase 0 — scaffolding. The stack runs end to end; features are
-> being built phase by phase. See [`BUILD_LOG.md`](./BUILD_LOG.md) for the
-> full record of what exists and why each choice was made.
+> **Status:** in progress. Auth, application tracking with a status pipeline and
+> timeline, resume upload with text extraction, and the async AI analysis
+> pipeline are all working. The dashboard and the searchable table view are
+> still to come. See [`BUILD_LOG.md`](./BUILD_LOG.md) for the full record of
+> what exists and why each choice was made.
 
 ## Tech stack
 
@@ -41,7 +43,11 @@ cp .env.example .env       # Windows PowerShell: Copy-Item .env.example .env
 npm install
 npm run dev                # → http://localhost:4000
 
-# 3. Configure the client (in a second terminal)
+# 3. Start the analysis worker (in a second terminal)
+cd server
+npm run worker             # processes AI analysis jobs from the queue
+
+# 4. Configure the client (in a third terminal)
 cd client
 cp .env.example .env       # Windows PowerShell: Copy-Item .env.example .env
 npm install
@@ -56,8 +62,13 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 Get a free `GEMINI_API_KEY` at <https://aistudio.google.com/app/apikey>.
 
-Open <http://localhost:5173>. A styled card showing **Connected** means the
-client, the API, Tailwind, React Query and CORS are all working.
+Open <http://localhost:5173> and sign up.
+
+> **Three processes, not two.** The API, the analysis worker and the web client
+> each run in their own terminal. The worker is separate on purpose: a slow AI
+> call must not occupy an HTTP connection, and the worker can be restarted or
+> scaled independently. If analyses stay stuck on "Analyzing…", the worker is
+> not running.
 
 ## Project layout
 
@@ -99,6 +110,8 @@ Run from `server/`:
 | Command | Does |
 | --- | --- |
 | `npm run dev` | Start the API with hot reload |
+| `npm run worker` | Start the AI analysis worker (a separate process — required for analyses to run) |
+| `npm test` | Run the test suite |
 | `npm run build` | Type-check and compile to `dist/` |
 | `npm start` | Run the compiled build |
 | `npm run typecheck` | Type-check without emitting |
@@ -142,3 +155,12 @@ It names the variables that are missing or malformed; fix them in `server/.env`.
 
 **`docker compose up` fails on Windows** — Docker Desktop must be running and
 WSL2 enabled.
+
+**An analysis is stuck on "Analyzing…"** — the worker is not running. Start it
+with `npm run worker` in `server/`. The API queues jobs; only the worker
+processes them.
+
+**An analysis comes back FAILED** — check the worker's terminal. The usual
+causes are an invalid `GEMINI_API_KEY`, a `GEMINI_MODEL` your key cannot
+access, or the free tier's rate limit. The application itself is unaffected;
+press **Retry analysis**.
