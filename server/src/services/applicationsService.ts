@@ -1,5 +1,6 @@
 import { prisma, type TransactionClient } from '../config/db';
 import { badRequest, notFound } from '../utils/AppError';
+import { requestAnalysisIfPossible } from './analysisService';
 import type {
   CreateApplicationInput,
   UpdateApplicationInput,
@@ -117,7 +118,7 @@ export async function createApplication(userId: string, input: CreateApplication
     await assertResumeBelongsToUser(userId, resumeId);
   }
 
-  return prisma.application.create({
+  const application = await prisma.application.create({
     data: {
       ...fields,
       userId,
@@ -132,6 +133,24 @@ export async function createApplication(userId: string, input: CreateApplication
     },
     include: applicationDetailInclude,
   });
+
+  /**
+   * Start the AI analysis, but only when there is something to analyse — an
+   * application saved without a resume has nothing to compare the job
+   * description against.
+   *
+   * This is awaited rather than left dangling, so the PENDING row exists
+   * before the response returns and the client's first poll finds it. What it
+   * does *not* do is wait for the analysis itself: the job is queued and a
+   * separate worker process picks it up, which is the whole reason the queue
+   * exists. `requestAnalysisIfPossible` also swallows its own failures, so a
+   * Redis outage cannot stop an application being created.
+   */
+  if (application.resumeId && application.jobDescription) {
+    await requestAnalysisIfPossible(userId, application.id);
+  }
+
+  return application;
 }
 
 /** One application with its history, analysis and resume. */

@@ -1,6 +1,8 @@
 import app from './app';
 import { env } from './config/env';
 import { disconnectDb } from './config/db';
+import { disconnectRedis } from './config/redis';
+import { closeAnalysisQueue } from './queues/analysisQueue';
 
 /**
  * Process entry point. Everything about *what* the app does lives in app.ts;
@@ -35,6 +37,11 @@ function shutdown(signal: string): void {
     }
 
     try {
+      // Release the queue producer and the cache connection as well as the
+      // database, so Redis is not left holding connections from a process that
+      // has exited.
+      await closeAnalysisQueue();
+      await disconnectRedis();
       await disconnectDb();
       console.log('[hiregrid] closed cleanly');
       process.exit(0);

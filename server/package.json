@@ -2,7 +2,7 @@
   "name": "hiregrid-server",
   "version": "0.1.0",
   "private": true,
-  "description": "HireGrid API server — AI-powered job application tracker",
+  "description": "HireGrid API server \u2014 AI-powered job application tracker",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -13,15 +13,20 @@
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "worker": "tsx watch src/worker.ts",
+    "worker:start": "node dist/worker.js"
   },
   "dependencies": {
+    "@google/genai": "^2.22.0",
     "@prisma/client": "^6.19.3",
     "bcrypt": "^6.0.0",
+    "bullmq": "^6.3.6",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "mammoth": "^1.12.3",
     "multer": "^2.3.0",

@@ -8,6 +8,7 @@ import healthRoutes from './routes/health.routes';
 import authRoutes from './routes/auth.routes';
 import applicationRoutes from './routes/applications.routes';
 import resumeRoutes from './routes/resumes.routes';
+import analysisRoutes from './routes/analysis.routes';
 
 /**
  * Builds the configured Express app, without starting a server.
@@ -51,6 +52,12 @@ app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/resumes', resumeRoutes);
+
+// Analysis endpoints are nested under an application (/api/applications/:id/
+// analysis). Mounting a second router at the same prefix is intentional:
+// Express tries them in order, and the application router's `/:id` cannot
+// match a two-segment path, so requests fall through to here unambiguously.
+app.use('/api/applications', analysisRoutes);
 
 // 5. Nothing matched — turn it into a 404 that flows through the error handler.
 app.use(notFoundHandler);

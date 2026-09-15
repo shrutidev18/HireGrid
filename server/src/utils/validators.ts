@@ -244,3 +244,44 @@ export const idParamSchema = z.object({
 export const resumeIdParamSchema = z.object({
   id: z.uuid({ error: 'Invalid resume id' }),
 });
+
+// ---------------------------------------------------------------------------
+// AI analysis
+// ---------------------------------------------------------------------------
+
+/**
+ * The shape the AI is asked to return, and the gate everything it says has to
+ * pass before it is trusted.
+ *
+ * This is the most important validation in the project. Everywhere else the
+ * untrusted input is a user, who is at least sending structured form data. Here
+ * it is a language model: it can return prose instead of JSON, invent fields,
+ * omit required ones, or answer a score of 150. Writing that into the database
+ * unchecked would put malformed data in front of every later reader — the
+ * dashboard's average score, the skill-gap aggregation — with no way to tell
+ * where it came from.
+ *
+ * The worker validates against this and, on failure, retries once with a
+ * stricter reminder before marking the analysis FAILED. A bad response is a
+ * recorded outcome, never a crashed worker.
+ */
+export const analysisResponseSchema = z.object({
+  requiredSkills: z.array(z.string()).max(50),
+  preferredSkills: z.array(z.string()).max(50),
+  matchedSkills: z.array(z.string()).max(50),
+  missingSkills: z.array(z.string()).max(50),
+
+  // Clamped to the range the UI draws. A model that returns 150 would render a
+  // progress ring past full and poison the dashboard average.
+  matchScore: z.number().int().min(0).max(100),
+
+  atsKeywords: z.object({
+    present: z.array(z.string()).max(50),
+    missing: z.array(z.string()).max(50),
+  }),
+
+  suggestions: z.array(z.string()).max(20),
+  reasoning: z.string().max(10_000),
+});
+
+export type AnalysisResponse = z.infer<typeof analysisResponseSchema>;

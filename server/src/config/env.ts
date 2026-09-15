@@ -59,6 +59,17 @@ const envSchema = z.object({
     'GEMINI_API_KEY is required (Google AI Studio API key)',
   ),
 
+  /**
+   * Which Gemini model the analysis worker calls.
+   *
+   * Configurable with a default rather than hard-coded, because model names
+   * are retired and replaced on Google's schedule, not ours. When that
+   * happens the fix is one line in .env instead of a code change and redeploy
+   * — and a key without access to a particular model can be pointed at one it
+   * does have.
+   */
+  GEMINI_MODEL: z.string().min(1).default('gemini-3.5-flash-lite'),
+
   CLIENT_URL: z.url({
     error: 'CLIENT_URL must be a valid URL (e.g. http://localhost:5173)',
   }),
