@@ -240,3 +240,37 @@ export const ACCEPTED_RESUME_EXTENSIONS = ['.pdf', '.docx'] as const;
 
 /** 5 MB, matching MAX_UPLOAD_BYTES on the server. */
 export const MAX_RESUME_BYTES = 5 * 1024 * 1024;
+
+// ---------------------------------------------------------------------------
+// AI analysis
+// ---------------------------------------------------------------------------
+
+/**
+ * The full analysis record.
+ *
+ * Note the shape difference from what the AI returns: the model produces a
+ * nested `atsKeywords: { present, missing }`, which the worker flattens into
+ * two database columns. The API returns the database shape, so the client sees
+ * `atsKeywordsPresent` / `atsKeywordsMissing`.
+ *
+ * Every array is non-nullable and defaults to empty, so components can map
+ * over them without a null check. `matchScore` is the exception — it is
+ * genuinely unknown until the analysis completes, and defaulting it to 0 would
+ * make a pending analysis look like a terrible match.
+ */
+export interface AnalysisResult {
+  id: string;
+  applicationId: string;
+  status: AnalysisStatus;
+  requiredSkills: string[];
+  preferredSkills: string[];
+  matchedSkills: string[];
+  missingSkills: string[];
+  matchScore: number | null;
+  atsKeywordsPresent: string[];
+  atsKeywordsMissing: string[];
+  suggestions: string[];
+  reasoning: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

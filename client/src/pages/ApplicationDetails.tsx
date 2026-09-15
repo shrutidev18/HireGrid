@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
+import AnalysisPanel from '../components/AnalysisPanel';
 import ConfirmDialog from '../components/ConfirmDialog';
 import StatusPipeline from '../components/StatusPipeline';
 import Timeline from '../components/Timeline';
@@ -218,6 +219,13 @@ export default function ApplicationDetails() {
         </section>
 
         <StatusPipeline applicationId={application.id} currentStatus={application.status} />
+
+        {/* Placed directly under the pipeline: after "where is this
+            application", the next question is "how good a fit is it". */}
+        <AnalysisPanel
+          applicationId={application.id}
+          hasResume={Boolean(application.resumeId)}
+        />
 
         <NotesEditor application={application} />
 
