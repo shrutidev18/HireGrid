@@ -54,3 +54,9 @@ desktop.ini
 
 # Assistant/tool output folders — not part of the project source
 Claude outputs/
+
+# Personal engineering journal - kept locally, not published
+BUILD_LOG.md
+
+# Scratch folder from a local git cleanup
+_to_delete/
