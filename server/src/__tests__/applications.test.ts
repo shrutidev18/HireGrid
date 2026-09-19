@@ -22,6 +22,7 @@ jest.mock('../config/db', () => ({
   prisma: {
     application: {
       findMany: jest.fn(),
+      count: jest.fn(),
       findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -43,6 +44,7 @@ import { signAuthToken, AUTH_COOKIE_NAME } from '../utils/jwt';
 const db = prisma as unknown as {
   application: {
     findMany: jest.Mock;
+    count: jest.Mock;
     findFirst: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
@@ -421,13 +423,233 @@ describe('DELETE /api/applications/:id', () => {
 });
 
 describe('GET /api/applications', () => {
-  it('lists only the requesting user’s applications', async () => {
-    db.application.findMany.mockResolvedValue([savedApplication]);
+  /** The `where` clause the service actually sent to Prisma. */
+  const whereClause = () => db.application.findMany.mock.calls[0][0].where;
 
+  /** The `orderBy` the service actually sent. */
+  const orderByClause = () => db.application.findMany.mock.calls[0][0].orderBy;
+
+  beforeEach(() => {
+    db.application.findMany.mockResolvedValue([savedApplication]);
+    db.application.count.mockResolvedValue(1);
+  });
+
+  it('lists only the requesting user’s applications', async () => {
     const res = await request(app).get('/api/applications').set('Cookie', cookie);
 
     expect(res.status).toBe(200);
-    expect(res.body.applications).toHaveLength(1);
-    expect(db.application.findMany.mock.calls[0][0].where).toEqual({ userId: USER_ID });
+    expect(res.body.data).toHaveLength(1);
+    expect(whereClause()).toEqual({ userId: USER_ID });
+  });
+
+  it('returns the pagination envelope, not a bare array', async () => {
+    db.application.count.mockResolvedValue(57);
+
+    const res = await request(app).get('/api/applications').set('Cookie', cookie);
+
+    // `total` is what lets the client render a pager without a second request.
+    expect(res.body).toMatchObject({ total: 57, page: 1, pageSize: 20 });
+    expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('defaults to the most recently updated first', async () => {
+    await request(app).get('/api/applications').set('Cookie', cookie);
+
+    expect(orderByClause()[0]).toEqual({ updatedAt: 'desc' });
+  });
+
+  it('always appends a unique tiebreaker to the sort', async () => {
+    // Without this, rows sharing a sort value have no defined order and can
+    // appear on two pages — or on none — as PostgreSQL is free to return them
+    // differently between queries.
+    await request(app).get('/api/applications?sortBy=companyName').set('Cookie', cookie);
+
+    expect(orderByClause()[1]).toEqual({ id: 'asc' });
+  });
+
+  // -- search ---------------------------------------------------------------
+
+  it('searches company, job title and location, case-insensitively', async () => {
+    await request(app).get('/api/applications?search=infosys').set('Cookie', cookie);
+
+    expect(whereClause().OR).toEqual([
+      { companyName: { contains: 'infosys', mode: 'insensitive' } },
+      { jobTitle: { contains: 'infosys', mode: 'insensitive' } },
+      { jobLocation: { contains: 'infosys', mode: 'insensitive' } },
+    ]);
+  });
+
+  it('keeps the search scoped to the user', async () => {
+    // The dangerous shape of this bug: an OR clause that sits beside `userId`
+    // is an AND of the two, but an OR that *swallows* it would match every
+    // user's rows. Asserting userId survives alongside OR is the check.
+    await request(app).get('/api/applications?search=acme').set('Cookie', cookie);
+
+    expect(whereClause().userId).toBe(USER_ID);
+  });
+
+  it('ignores a blank search rather than filtering on an empty string', async () => {
+    await request(app).get('/api/applications?search=%20%20').set('Cookie', cookie);
+
+    expect(whereClause().OR).toBeUndefined();
+  });
+
+  // -- filters --------------------------------------------------------------
+
+  it.each([
+    ['status=OFFER', { status: 'OFFER' }],
+    ['employmentType=INTERNSHIP', { employmentType: 'INTERNSHIP' }],
+    ['workMode=REMOTE', { workMode: 'REMOTE' }],
+  ])('applies %s on its own', async (queryString, expected) => {
+    await request(app).get(`/api/applications?${queryString}`).set('Cookie', cookie);
+
+    expect(whereClause()).toMatchObject(expected);
+  });
+
+  it('filters by the resume used', async () => {
+    const resumeId = 'dddddddd-0000-4000-8000-000000000004';
+
+    await request(app).get(`/api/applications?resumeId=${resumeId}`).set('Cookie', cookie);
+
+    expect(whereClause().resumeId).toBe(resumeId);
+  });
+
+  it('combines several filters as AND', async () => {
+    await request(app)
+      .get('/api/applications?search=acme&status=APPLIED&workMode=REMOTE')
+      .set('Cookie', cookie);
+
+    const where = whereClause();
+
+    expect(where.userId).toBe(USER_ID);
+    expect(where.status).toBe('APPLIED');
+    expect(where.workMode).toBe('REMOTE');
+    expect(where.OR).toHaveLength(3);
+  });
+
+  it('omits filters that were not supplied', async () => {
+    await request(app).get('/api/applications?status=OFFER').set('Cookie', cookie);
+
+    const where = whereClause();
+
+    // Absent rather than present-and-undefined: the clause you can log is the
+    // clause you can debug.
+    expect(where).not.toHaveProperty('workMode');
+    expect(where).not.toHaveProperty('employmentType');
+    expect(where).not.toHaveProperty('dateApplied');
+  });
+
+  // -- date range -----------------------------------------------------------
+
+  it('applies a date range inclusive of both ends', async () => {
+    await request(app)
+      .get('/api/applications?dateFrom=2026-09-01&dateTo=2026-09-10')
+      .set('Cookie', cookie);
+
+    const range = whereClause().dateApplied;
+
+    expect(range.gte).toEqual(new Date('2026-09-01'));
+
+    // The upper bound is pushed to the end of the chosen day. Left at
+    // midnight, an application saved at 09:30 on the 10th would fall outside
+    // a range that explicitly ends on the 10th.
+    expect(range.lte.toISOString()).toContain('2026-09-10');
+    expect(range.lte.getTime()).toBeGreaterThan(new Date('2026-09-10').getTime());
+  });
+
+  it('accepts an open-ended range', async () => {
+    await request(app).get('/api/applications?dateFrom=2026-09-01').set('Cookie', cookie);
+
+    const range = whereClause().dateApplied;
+
+    expect(range.gte).toBeDefined();
+    expect(range.lte).toBeUndefined();
+  });
+
+  // -- sorting --------------------------------------------------------------
+
+  it('sorts by company name in both directions', async () => {
+    await request(app)
+      .get('/api/applications?sortBy=companyName&sortOrder=asc')
+      .set('Cookie', cookie);
+
+    expect(orderByClause()[0]).toEqual({ companyName: 'asc' });
+  });
+
+  it('sorts by applied date with nulls last', async () => {
+    await request(app)
+      .get('/api/applications?sortBy=dateApplied&sortOrder=desc')
+      .set('Cookie', cookie);
+
+    // dateApplied is null for anything still at SAVED. Descending, nulls sort
+    // first by default — so the top of the table would be applications the
+    // user has not applied to yet.
+    expect(orderByClause()[0]).toEqual({
+      dateApplied: { sort: 'desc', nulls: 'last' },
+    });
+  });
+
+  // -- pagination -----------------------------------------------------------
+
+  it('translates page and pageSize into skip and take', async () => {
+    await request(app).get('/api/applications?page=3&pageSize=10').set('Cookie', cookie);
+
+    const args = db.application.findMany.mock.calls[0][0];
+
+    expect(args.skip).toBe(20);
+    expect(args.take).toBe(10);
+  });
+
+  it('counts against the same filters as the rows it returns', async () => {
+    // A count taken without the filters would make the pager promise pages
+    // that paging through never produces.
+    await request(app).get('/api/applications?status=OFFER').set('Cookie', cookie);
+
+    expect(db.application.count.mock.calls[0][0].where).toEqual(whereClause());
+  });
+
+  it('caps pageSize so one request cannot ask for everything', async () => {
+    await request(app).get('/api/applications?pageSize=1000000').set('Cookie', cookie);
+
+    expect(db.application.findMany.mock.calls[0][0].take).toBe(20);
+  });
+
+  // -- tolerance of bad input ----------------------------------------------
+
+  it('ignores unrecognised values instead of erroring', async () => {
+    // A bookmarked URL from an older release, or a hand-edited one. Answering
+    // with a 400 and a blank screen is worse than ignoring the part that no
+    // longer parses.
+    const res = await request(app)
+      .get('/api/applications?status=NONSENSE&sortBy=salary&sortOrder=sideways&page=-4')
+      .set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+
+    const where = whereClause();
+    expect(where).not.toHaveProperty('status');
+
+    // Fell back to the defaults rather than passing junk to the database.
+    expect(orderByClause()[0]).toEqual({ updatedAt: 'desc' });
+    expect(db.application.findMany.mock.calls[0][0].skip).toBe(0);
+  });
+
+  it('ignores unknown query parameters entirely', async () => {
+    const res = await request(app)
+      .get('/api/applications?dropTable=applications')
+      .set('Cookie', cookie);
+
+    expect(res.status).toBe(200);
+    expect(whereClause()).toEqual({ userId: USER_ID });
+  });
+
+  it('never lets a sort field reach the database unchecked', async () => {
+    // sortBy arrives from the URL and ends up naming a column. The enum is
+    // what stands between those two facts.
+    await request(app)
+      .get('/api/applications?sortBy=user.passwordHash')
+      .set('Cookie', cookie);
+
+    expect(orderByClause()[0]).toEqual({ updatedAt: 'desc' });
   });
 });
