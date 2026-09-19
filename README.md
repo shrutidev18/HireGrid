@@ -20,19 +20,19 @@ specific suggestions for tailoring the resume to that posting.
 **Working now**
 
 - Email and password auth — bcrypt hashing, JWT in an httpOnly cookie
-- Track applications through a status pipeline: Saved → Applied → Interviewing → Offer / Rejected
+- Track applications through a seven-stage pipeline: Saved, Applied, Online Assessment, Tech Interview, HR Interview, Offer — with Rejected reachable from any stage
 - Every status change is recorded in an append-only timeline, so the history can't be rewritten
 - Upload resumes as PDF or DOCX; text is extracted server-side and stored for analysis
 - File type verified by magic bytes, not by the file extension
 - AI analysis against any job description: match score, required vs. preferred skills, matched vs. missing skills, ATS keywords, tailoring suggestions
 - Analysis runs in a background worker, so saving an application returns immediately
 - Identical resume + job description pairs are served from cache without a second AI call
-- 100 automated tests
+- Searchable, filterable, sortable table: search across company, role and location; filter by status, employment type, work mode, resume used and applied-date range; sort by company or applied date; paginated
+- 122 automated tests
 
 **Planned**
 
 - Analytics dashboard — application volume over time, status breakdown, response rates
-- Searchable and sortable table view with filters
 - Profile page
 
 ---
@@ -170,7 +170,7 @@ authenticated user.
 | `POST` | `/auth/login` | Log in, sets the session cookie |
 | `POST` | `/auth/logout` | Clear the session cookie |
 | `GET` | `/auth/me` | Current user |
-| `GET` | `/applications` | List the user's applications |
+| `GET` | `/applications` | List, with search, filters, sorting and pagination |
 | `POST` | `/applications` | Create one (queues an analysis if a resume is attached) |
 | `GET` | `/applications/:id` | One application, with its status timeline |
 | `PUT` | `/applications/:id` | Update |
