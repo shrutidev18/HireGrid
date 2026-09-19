@@ -3,6 +3,7 @@ import { badRequest, notFound } from '../utils/AppError';
 import { requestAnalysisIfPossible } from './analysisService';
 import type {
   CreateApplicationInput,
+  ListApplicationsQuery,
   UpdateApplicationInput,
   UpdateStatusInput,
 } from '../utils/validators';
@@ -72,34 +73,172 @@ async function assertResumeBelongsToUser(userId: string, resumeId: string): Prom
 }
 
 /** Everything the current user is tracking, most recently touched first. */
-export async function listApplications(userId: string) {
-  return prisma.application.findMany({
-    where: { userId },
+/**
+ * Columns returned in a list.
+ *
+ * Deliberately not loading statusHistory or the job description here. A page
+ * of twenty applications does not need twenty full job descriptions, and
+ * sending them would make the table slow for no visible benefit.
+ */
+const applicationListSelect = {
+  id: true,
+  companyName: true,
+  jobTitle: true,
+  jobLocation: true,
+  employmentType: true,
+  workMode: true,
+  status: true,
+  dateApplied: true,
+  salary: true,
+  createdAt: true,
+  updatedAt: true,
+  resume: { select: { id: true, fileName: true } },
+  analysisResult: { select: { status: true, matchScore: true } },
+} as const;
 
-    // Ordered by updatedAt rather than createdAt so an application the user
-    // just moved to "Interview" rises to the top — recency of activity is
-    // more useful than recency of entry.
-    orderBy: { updatedAt: 'desc' },
+/**
+ * Translates the parsed query into a Prisma `where` clause.
+ *
+ * Built by adding keys only when a filter is actually present, rather than
+ * always including every key and passing `undefined`. Prisma does ignore
+ * `undefined`, so both work — but a clause assembled this way is the thing you
+ * can log and read to answer "why did this row not come back", which is the
+ * question you actually have when a filter misbehaves.
+ *
+ * `userId` is set first and unconditionally. It is never derived from anything
+ * the client sends, so no combination of query parameters can widen the result
+ * beyond the requester's own rows.
+ */
+function buildApplicationWhere(userId: string, query: ListApplicationsQuery) {
+  /**
+   * The end of the chosen day, not its midnight.
+   *
+   * A date input sends `2026-09-10`, which parses to 00:00 on the 10th. Used
+   * as-is with `lte`, an application saved at 09:30 that morning falls outside
+   * its own date — the user picks a range ending "today" and today's rows
+   * vanish. Pushing the bound to the last millisecond of the day makes the
+   * filter mean what the UI says it means: inclusive of both ends.
+   */
+  const dateTo = query.dateTo ? new Date(query.dateTo) : undefined;
+  dateTo?.setHours(23, 59, 59, 999);
 
-    // Deliberately not loading statusHistory or the job description here. A
-    // list of fifty applications does not need fifty full job descriptions,
-    // and sending them would make the list slow for no visible benefit.
-    select: {
-      id: true,
-      companyName: true,
-      jobTitle: true,
-      jobLocation: true,
-      employmentType: true,
-      workMode: true,
-      status: true,
-      dateApplied: true,
-      salary: true,
-      createdAt: true,
-      updatedAt: true,
-      resume: { select: { id: true, fileName: true } },
-      analysisResult: { select: { status: true, matchScore: true } },
-    },
-  });
+  return {
+    userId,
+
+    /**
+     * One search box across three columns. `mode: 'insensitive'` is what makes
+     * "infosys" find "Infosys" — PostgreSQL's `LIKE` is case-sensitive, so
+     * without it the feature quietly only works when the user happens to match
+     * the company's own capitalisation.
+     */
+    ...(query.search
+      ? {
+          OR: [
+            { companyName: { contains: query.search, mode: 'insensitive' as const } },
+            { jobTitle: { contains: query.search, mode: 'insensitive' as const } },
+            { jobLocation: { contains: query.search, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+
+    ...(query.status ? { status: query.status } : {}),
+    ...(query.employmentType ? { employmentType: query.employmentType } : {}),
+    ...(query.workMode ? { workMode: query.workMode } : {}),
+    ...(query.resumeId ? { resumeId: query.resumeId } : {}),
+
+    ...(query.dateFrom || dateTo
+      ? {
+          dateApplied: {
+            ...(query.dateFrom ? { gte: query.dateFrom } : {}),
+            ...(dateTo ? { lte: dateTo } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+/**
+ * Sort order, always with a tiebreaker.
+ *
+ * The second key is not decoration. With `ORDER BY dateApplied DESC` alone,
+ * rows sharing a date have no defined order, and PostgreSQL is free to return
+ * them differently between two queries. Under pagination that means a row can
+ * appear on page 1 and again on page 2 while another is never shown at all.
+ * Appending a unique column makes the total order deterministic.
+ *
+ * `nulls: 'last'` matters for `dateApplied`, which is null for anything still
+ * at SAVED. Sorted descending, nulls sort first by default, so the entire top
+ * of the table would be applications the user has not applied to yet.
+ */
+function buildApplicationOrderBy(query: ListApplicationsQuery) {
+  const direction = query.sortOrder;
+  const tiebreak = { id: 'asc' as const };
+
+  /**
+   * An explicit branch per column rather than `{ [query.sortBy]: direction }`.
+   *
+   * The computed-key version is shorter and worse. It puts a value that
+   * originated in the URL into the position where a column name goes, and the
+   * only thing standing between that and an arbitrary column is the Zod enum.
+   * Spelling the three cases out means the set of sortable columns is fixed in
+   * the code, the compiler checks each one against the schema, and the switch
+   * is exhaustive — a fourth sort field added to the enum without being
+   * handled here fails to compile rather than failing at runtime.
+   */
+  switch (query.sortBy) {
+    case 'companyName':
+      return [{ companyName: direction }, tiebreak];
+
+    /**
+     * `nulls: 'last'` matters here and nowhere else. `dateApplied` is null for
+     * anything still at SAVED, and sorted descending, nulls come first by
+     * default — so the entire top of the table would be applications the user
+     * has not actually applied to yet.
+     */
+    case 'dateApplied':
+      return [{ dateApplied: { sort: direction, nulls: 'last' as const } }, tiebreak];
+
+    case 'updatedAt':
+      return [{ updatedAt: direction }, tiebreak];
+  }
+}
+
+/**
+ * One page of the user's applications, with the total for the pager.
+ *
+ * Defaults to ordering by `updatedAt` rather than `createdAt` so an
+ * application the user just moved to "Tech Interview" rises to the top —
+ * recency of activity is more useful than recency of entry.
+ */
+export async function listApplications(userId: string, query: ListApplicationsQuery) {
+  const where = buildApplicationWhere(userId, query);
+
+  /**
+   * The count and the page are fetched together.
+   *
+   * `total` has to be computed against the same filters as the rows, otherwise
+   * the pager shows a page count that does not match what paging through
+   * actually produces. Running them concurrently rather than in sequence means
+   * the extra query costs no extra latency.
+   */
+  const [total, data] = await Promise.all([
+    prisma.application.count({ where }),
+    prisma.application.findMany({
+      where,
+      orderBy: buildApplicationOrderBy(query),
+
+      // Offset pagination. Keyset pagination scales better on very large
+      // tables, but it cannot jump to an arbitrary page — and a pager with
+      // numbered pages is exactly what this screen asks for. At the scale of
+      // one person's job applications, offset is the right trade.
+      skip: (query.page - 1) * query.pageSize,
+      take: query.pageSize,
+
+      select: applicationListSelect,
+    }),
+  ]);
+
+  return { data, total, page: query.page, pageSize: query.pageSize };
 }
 
 /**

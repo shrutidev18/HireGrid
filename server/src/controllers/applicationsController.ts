@@ -4,6 +4,7 @@ import { getUserId } from '../middleware/authMiddleware';
 import {
   createApplicationSchema,
   idParamSchema,
+  listApplicationsQuerySchema,
   updateApplicationSchema,
   updateStatusSchema,
 } from '../utils/validators';
@@ -20,11 +21,23 @@ import * as applicationsService from '../services/applicationsService';
  * response in the API identical in shape.
  */
 
-/** GET /api/applications */
+/**
+ * GET /api/applications
+ *
+ * The one endpoint here that reads the query string. It uses `.parse()` like
+ * the others, but the schema behind it never throws: invalid filters are
+ * dropped rather than rejected, so a stale bookmarked URL still renders a
+ * usable screen. See `listApplicationsQuerySchema` for why.
+ */
 export async function listApplications(req: Request, res: Response): Promise<void> {
-  const applications = await applicationsService.listApplications(getUserId(req));
+  const query = listApplicationsQuerySchema.parse(req.query);
 
-  res.status(200).json({ applications });
+  const page = await applicationsService.listApplications(getUserId(req), query);
+
+  // `{ data, total, page, pageSize }` rather than a bare array: a paginated
+  // response has to carry the total, or the client cannot render a pager
+  // without a second request to count.
+  res.status(200).json(page);
 }
 
 /** POST /api/applications */

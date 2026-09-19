@@ -228,6 +228,77 @@ export const updateStatusSchema = z.object({
 
 export type UpdateStatusInput = z.infer<typeof updateStatusSchema>;
 
+// ---------------------------------------------------------------------------
+// Listing: search, filters, sorting, pagination
+// ---------------------------------------------------------------------------
+
+/** Columns the table is allowed to sort by. */
+export const APPLICATION_SORT_FIELDS = ['companyName', 'dateApplied', 'updatedAt'] as const;
+
+export const SORT_ORDERS = ['asc', 'desc'] as const;
+
+/**
+ * Query parameters are **dropped when invalid, not rejected**.
+ *
+ * This is the opposite of how request bodies are handled in this file, and the
+ * difference is deliberate. A body is written by the application, so a bad
+ * field is a bug and should fail loudly. A query string is written by the
+ * *URL* — someone bookmarks a filtered view, a status is renamed in a later
+ * release, a link is shared and hand-edited. Answering a stale bookmark with a
+ * 400 and an empty screen is a worse outcome than quietly ignoring the part
+ * that no longer makes sense and showing the rest.
+ *
+ * `.catch()` is what implements that: when a value fails to parse, the schema
+ * yields the fallback instead of throwing. Filters fall back to `undefined`,
+ * which the service reads as "this filter was not applied".
+ *
+ * Note this drops *unrecognised values*, not unrecognised *keys* — Zod already
+ * strips unknown keys by default, so `?nonsense=1` never reaches the service.
+ */
+const droppedIfInvalid = <T extends z.ZodTypeAny>(schema: T) =>
+  schema.optional().catch(undefined);
+
+export const listApplicationsQuerySchema = z.object({
+  /**
+   * Free-text search. Trimmed, and an empty string becomes `undefined` so that
+   * clearing the search box is not treated as "match rows containing nothing"
+   * — with `contains`, an empty needle matches every row, which happens to be
+   * the right answer here but for entirely the wrong reason.
+   */
+  search: droppedIfInvalid(z.string().trim().min(1).max(200)),
+
+  status: droppedIfInvalid(z.enum(APPLICATION_STATUSES)),
+  employmentType: droppedIfInvalid(z.enum(EMPLOYMENT_TYPES)),
+  workMode: droppedIfInvalid(z.enum(WORK_MODES)),
+  resumeId: droppedIfInvalid(z.uuid()),
+
+  /**
+   * `z.coerce.date()` because everything in a query string is a string.
+   * A malformed date is dropped rather than rejected, on the same reasoning as
+   * the filters above.
+   */
+  dateFrom: droppedIfInvalid(z.coerce.date()),
+  dateTo: droppedIfInvalid(z.coerce.date()),
+
+  sortBy: z.enum(APPLICATION_SORT_FIELDS).catch('updatedAt'),
+  sortOrder: z.enum(SORT_ORDERS).catch('desc'),
+
+  /**
+   * `.catch()` covers both "absent" and "nonsense" in one step: a missing
+   * `page` coerces to NaN, fails `.int()`, and lands on the fallback.
+   */
+  page: z.coerce.number().int().min(1).catch(1),
+
+  /**
+   * Capped at 100. Without an upper bound, `?pageSize=1000000` is a one-line
+   * denial of service — the database materialises every row the user owns and
+   * the API serialises it all into one response.
+   */
+  pageSize: z.coerce.number().int().min(1).max(100).catch(20),
+});
+
+export type ListApplicationsQuery = z.infer<typeof listApplicationsQuerySchema>;
+
 /**
  * Route parameters that carry a resource id.
  *
