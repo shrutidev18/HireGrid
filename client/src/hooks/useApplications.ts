@@ -1,7 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 
 import * as applicationsApi from '../api/applications';
 import type {
+  ApplicationListQuery,
   CreateApplicationPayload,
   UpdateApplicationPayload,
   UpdateStatusPayload,
@@ -20,14 +26,40 @@ import type {
 export const applicationKeys = {
   all: ['applications'] as const,
   lists: () => [...applicationKeys.all, 'list'] as const,
+
+  /**
+   * One cache entry per unique combination of search, filters, sort and page.
+   *
+   * The query object is part of the key, which is the whole mechanism. Without
+   * it every filter combination would share one entry, so switching from
+   * "Offer" to "Rejected" would show the previous filter's rows until the
+   * refetch landed — and going back would refetch something already held.
+   * With it, results are cached per combination, so returning to a filter you
+   * used a moment ago is instant.
+   *
+   * It nests under `lists()` so `invalidateQueries({ queryKey: lists() })`
+   * still invalidates every filtered view at once. A mutation does not need to
+   * know which filters are currently on screen.
+   */
+  list: (query: ApplicationListQuery) => [...applicationKeys.lists(), query] as const,
+
   detail: (id: string) => [...applicationKeys.all, 'detail', id] as const,
 };
 
-/** Every application the signed-in user is tracking. */
-export function useApplicationsList() {
+/**
+ * One page of applications for the current search, filters and sort.
+ *
+ * `placeholderData: keepPreviousData` is what stops the table flashing empty
+ * on every keystroke and page change. Without it each new key is a cache miss,
+ * so the component re-renders with no data while the request is in flight and
+ * the table collapses to its empty state and back. Keeping the previous page
+ * visible while the next one loads turns that flicker into a quiet update.
+ */
+export function useApplicationsList(query: ApplicationListQuery) {
   return useQuery({
-    queryKey: applicationKeys.lists(),
-    queryFn: applicationsApi.fetchApplications,
+    queryKey: applicationKeys.list(query),
+    queryFn: () => applicationsApi.fetchApplications(query),
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -207,6 +207,50 @@ export interface UpdateStatusResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Listing: search, filters, sorting, pagination
+// ---------------------------------------------------------------------------
+
+export const APPLICATION_SORT_FIELDS = ['companyName', 'dateApplied', 'updatedAt'] as const;
+export type ApplicationSortField = (typeof APPLICATION_SORT_FIELDS)[number];
+
+export type SortOrder = 'asc' | 'desc';
+
+/**
+ * Every control on the applications screen, in one object.
+ *
+ * Kept as a single value rather than a dozen separate `useState` calls because
+ * it is also the React Query cache key. One object means one place that
+ * decides what makes a request distinct — add a filter here and it is
+ * automatically part of the key, instead of being silently absent from it and
+ * serving cached results for the wrong filter.
+ *
+ * Dates are `YYYY-MM-DD` strings, which is exactly what `<input type="date">`
+ * produces and what the server's `z.coerce.date()` accepts. Converting to a
+ * `Date` on the client would only mean converting back.
+ */
+export interface ApplicationListQuery {
+  search?: string;
+  status?: ApplicationStatus;
+  employmentType?: EmploymentType;
+  workMode?: WorkMode;
+  resumeId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  sortBy: ApplicationSortField;
+  sortOrder: SortOrder;
+  page: number;
+  pageSize: number;
+}
+
+/** One page of results, plus what the pager needs to render itself. */
+export interface ApplicationListResponse {
+  data: ApplicationListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+// ---------------------------------------------------------------------------
 // Resumes
 // ---------------------------------------------------------------------------
 

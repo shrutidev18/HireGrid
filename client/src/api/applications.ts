@@ -1,7 +1,8 @@
 import { apiClient } from './client';
 import type {
   Application,
-  ApplicationListItem,
+  ApplicationListQuery,
+  ApplicationListResponse,
   CreateApplicationPayload,
   UpdateApplicationPayload,
   UpdateStatusPayload,
@@ -17,11 +18,35 @@ import type {
  * knowing anything about axios.
  */
 
-export async function fetchApplications(): Promise<ApplicationListItem[]> {
-  const { data } = await apiClient.get<{ applications: ApplicationListItem[] }>(
-    '/api/applications',
-  );
-  return data.applications;
+/**
+ * One page of applications, filtered and sorted by the server.
+ *
+ * All of it happens server-side — the search, the filters, the sort and the
+ * paging. Fetching every row and filtering in the browser would work fine with
+ * thirty applications and fall over with three thousand, and it would send
+ * every row to the client just to display twenty of them. Pushing the work to
+ * the database is also what lets the indexes do their job.
+ *
+ * Empty values are stripped before the request, so a cleared filter disappears
+ * from the URL rather than being sent as `status=`, which the server would
+ * have to parse only to discard.
+ */
+export async function fetchApplications(
+  query: ApplicationListQuery,
+): Promise<ApplicationListResponse> {
+  const params: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null && value !== '') {
+      params[key] = String(value);
+    }
+  }
+
+  const { data } = await apiClient.get<ApplicationListResponse>('/api/applications', {
+    params,
+  });
+
+  return data;
 }
 
 export async function fetchApplication(id: string): Promise<Application> {
