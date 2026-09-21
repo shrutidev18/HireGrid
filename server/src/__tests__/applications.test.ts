@@ -18,6 +18,28 @@ const tx = {
   statusHistory: { create: jest.fn() },
 };
 
+/**
+ * Redis is mocked here even though this suite is about applications.
+ *
+ * The service gained a cache dependency in Phase 7 — every write invalidates
+ * the user's cached dashboard — and that pulled the real ioredis client into a
+ * suite that had never needed it. With no Redis running, `del()` sat retrying
+ * the connection and the whole suite hung rather than failing. A service that
+ * talks to infrastructure drags that infrastructure into every test of it; the
+ * mock is what keeps these tests about application logic.
+ */
+jest.mock('../config/redis', () => ({
+  redis: { get: jest.fn(), set: jest.fn(), del: jest.fn().mockResolvedValue(1) },
+  createQueueConnection: jest.fn(),
+  disconnectRedis: jest.fn(),
+}));
+
+jest.mock('../queues/analysisQueue', () => ({
+  ANALYSIS_QUEUE_NAME: 'analysis-queue',
+  enqueueAnalysis: jest.fn(),
+  closeAnalysisQueue: jest.fn(),
+}));
+
 jest.mock('../config/db', () => ({
   prisma: {
     application: {

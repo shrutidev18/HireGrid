@@ -32,11 +32,17 @@ jest.mock('../services/cacheService', () => ({
   getCachedAnalysis: jest.fn(),
   setCachedAnalysis: jest.fn(),
   ANALYSIS_CACHE_TTL_SECONDS: 2592000,
+  // Added in Phase 7: the worker invalidates the owner's cached dashboard once
+  // a result is written, and every application write does the same.
+  invalidateDashboard: jest.fn(),
+  getCachedDashboard: jest.fn(),
+  setCachedDashboard: jest.fn(),
+  DASHBOARD_CACHE_TTL_SECONDS: 300,
 }));
 
 jest.mock('../config/db', () => ({
   prisma: {
-    application: { findFirst: jest.fn(), create: jest.fn() },
+    application: { findFirst: jest.fn(), findUnique: jest.fn(), create: jest.fn() },
     analysisResult: { findUnique: jest.fn(), upsert: jest.fn() },
     resume: { findFirst: jest.fn() },
   },
@@ -55,7 +61,7 @@ import { signAuthToken, AUTH_COOKIE_NAME } from '../utils/jwt';
 import type { AnalysisJobData } from '../queues/analysisQueue';
 
 const db = prisma as unknown as {
-  application: { findFirst: jest.Mock; create: jest.Mock };
+  application: { findFirst: jest.Mock; findUnique: jest.Mock; create: jest.Mock };
   analysisResult: { findUnique: jest.Mock; upsert: jest.Mock };
   resume: { findFirst: jest.Mock };
 };
