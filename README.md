@@ -9,9 +9,10 @@ returns a match score, the required skills you're missing, ATS keyword gaps, and
 specific suggestions for tailoring the resume to that posting.
 
 > **Status: in progress.** Authentication, application tracking with a status
-> pipeline and audit timeline, resume upload with text extraction, and the
-> asynchronous AI analysis pipeline are all built and working. The analytics
-> dashboard and the searchable/filterable table view are still to come.
+> pipeline and audit timeline, resume upload with text extraction, the
+> asynchronous AI analysis pipeline, the searchable/filterable table view and
+> the analytics dashboard are all built and working. A profile page is still to
+> come.
 
 ---
 
@@ -28,11 +29,11 @@ specific suggestions for tailoring the resume to that posting.
 - Analysis runs in a background worker, so saving an application returns immediately
 - Identical resume + job description pairs are served from cache without a second AI call
 - Searchable, filterable, sortable table: search across company, role and location; filter by status, employment type, work mode, resume used and applied-date range; sort by company or applied date; paginated
-- 122 automated tests
+- Analytics dashboard: five summary figures, a status funnel, an 8-week match-score trend, aggregated skill gaps, applications going stale, and a recent-activity feed — computed in one query batch and cached in Redis per user
+- 150 automated tests
 
 **Planned**
 
-- Analytics dashboard — application volume over time, status breakdown, response rates
 - Profile page
 
 ---
@@ -166,6 +167,7 @@ authenticated user.
 | Method | Route | Does |
 | --- | --- | --- |
 | `GET` | `/health` | Liveness check |
+| `GET` | `/dashboard` | Every dashboard figure in one payload (cached 5 min per user) |
 | `POST` | `/auth/signup` | Create an account |
 | `POST` | `/auth/login` | Log in, sets the session cookie |
 | `POST` | `/auth/logout` | Clear the session cookie |
