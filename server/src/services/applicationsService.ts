@@ -1,6 +1,7 @@
 import { prisma, type TransactionClient } from '../config/db';
 import { badRequest, notFound } from '../utils/AppError';
 import { requestAnalysisIfPossible } from './analysisService';
+import { invalidateDashboard } from './cacheService';
 import type {
   CreateApplicationInput,
   ListApplicationsQuery,
@@ -289,6 +290,17 @@ export async function createApplication(userId: string, input: CreateApplication
     await requestAnalysisIfPossible(userId, application.id);
   }
 
+  /**
+   * Every dashboard number just changed. Dropping the cached payload is what
+   * makes the dashboard reflect this application the next time it is opened,
+   * rather than up to five minutes later.
+   *
+   * Invalidation lives in the service, not the controller, because the service
+   * is where the write happens. In the controller it would be a step a future
+   * caller could bypass by calling the service directly.
+   */
+  await invalidateDashboard(userId);
+
   return application;
 }
 
@@ -325,11 +337,15 @@ export async function updateApplication(
 
   // Safe to update by id alone now that ownership is established. `userId` is
   // never in `data`, so an application cannot be reassigned to another user.
-  return prisma.application.update({
+  const application = await prisma.application.update({
     where: { id },
     data: input,
     include: applicationDetailInclude,
   });
+
+  await invalidateDashboard(userId);
+
+  return application;
 }
 
 /**
@@ -350,7 +366,7 @@ export async function updateApplicationStatus(
   id: string,
   input: UpdateStatusInput,
 ) {
-  return prisma.$transaction(async (tx: TransactionClient) => {
+  const result = await prisma.$transaction(async (tx: TransactionClient) => {
     const existing = await tx.application.findFirst({
       where: { id, userId },
       select: { id: true },
@@ -384,6 +400,18 @@ export async function updateApplicationStatus(
 
     return { application, statusHistory };
   });
+
+  /**
+   * Invalidated *after* the transaction commits, never inside it.
+   *
+   * Inside, a rollback after the delete would leave the cache cleared for a
+   * change that never happened — harmless here, but the same pattern with a
+   * cache *write* inside a transaction caches a row that was rolled back. The
+   * rule is that cache effects follow the commit.
+   */
+  await invalidateDashboard(userId);
+
+  return result;
 }
 
 /**
@@ -401,4 +429,6 @@ export async function deleteApplication(userId: string, id: string): Promise<voi
   await findOwnedApplicationId(userId, id);
 
   await prisma.application.delete({ where: { id } });
+
+  await invalidateDashboard(userId);
 }

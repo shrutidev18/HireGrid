@@ -87,3 +87,96 @@ export async function setCachedAnalysis(
     console.error('[hiregrid] cache write failed:', (err as Error).message);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+
+/**
+ * The dashboard cache is a different kind of cache from the one above, and the
+ * difference decides everything about how it is handled.
+ *
+ * The analysis cache is keyed by a hash of immutable inputs, so an entry can
+ * never become wrong — only stale in the sense of "computed by an older
+ * model". The dashboard is keyed by *user*, and every number in it changes the
+ * moment that user touches an application. It can absolutely become wrong, so
+ * it has both a short TTL and explicit invalidation on every write.
+ */
+const DASHBOARD_PREFIX = 'dashboard:';
+
+/**
+ * Five minutes.
+ *
+ * This is the backstop, not the mechanism. Every mutation deletes the key
+ * outright, so in normal operation the cache is never stale at all. The TTL
+ * exists for the paths invalidation cannot see — a row changed by a migration,
+ * by Prisma Studio, or by a future service that forgets to call the
+ * invalidator. Five minutes bounds how wrong the screen can get when that
+ * happens, without making the cache pointless.
+ */
+export const DASHBOARD_CACHE_TTL_SECONDS = 5 * 60;
+
+function dashboardKey(userId: string): string {
+  return `${DASHBOARD_PREFIX}${userId}`;
+}
+
+/**
+ * Reads a cached dashboard payload.
+ *
+ * Returns `unknown` deliberately: this module's job is to move bytes in and
+ * out of Redis, not to vouch for their shape. The caller owns the type.
+ *
+ * Never throws, for the same reason as the analysis cache — Redis being down
+ * should make the dashboard slower, not broken.
+ */
+export async function getCachedDashboard(userId: string): Promise<unknown | null> {
+  try {
+    const raw = await redis.get(dashboardKey(userId));
+    return raw ? (JSON.parse(raw) as unknown) : null;
+  } catch (err) {
+    console.error(
+      '[hiregrid] dashboard cache read failed, recomputing:',
+      (err as Error).message,
+    );
+    return null;
+  }
+}
+
+/** Stores a dashboard payload with the 5-minute TTL. */
+export async function setCachedDashboard(userId: string, payload: unknown): Promise<void> {
+  try {
+    await redis.set(
+      dashboardKey(userId),
+      JSON.stringify(payload),
+      'EX',
+      DASHBOARD_CACHE_TTL_SECONDS,
+    );
+  } catch (err) {
+    console.error('[hiregrid] dashboard cache write failed:', (err as Error).message);
+  }
+}
+
+/**
+ * Drops one user's cached dashboard.
+ *
+ * Called from every path that changes something the dashboard counts. It is
+ * deliberately a *delete* rather than a recompute-and-store: recomputing on
+ * write would run six queries on every status change, most of them for a
+ * dashboard nobody is about to look at. Deleting costs one Redis command and
+ * moves the work to the next person who actually opens the page.
+ *
+ * Swallows its own errors, and that is the important part. An application must
+ * still save when Redis is unavailable. The cost of a failed invalidation is a
+ * dashboard that is up to five minutes stale; the cost of letting it throw
+ * would be a user unable to update a status because a *cache* is down.
+ */
+export async function invalidateDashboard(userId: string): Promise<void> {
+  try {
+    await redis.del(dashboardKey(userId));
+  } catch (err) {
+    console.error(
+      `[hiregrid] could not invalidate dashboard cache for ${userId}:`,
+      (err as Error).message,
+    );
+  }
+}

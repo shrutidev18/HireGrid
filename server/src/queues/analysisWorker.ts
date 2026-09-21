@@ -3,7 +3,11 @@ import { Worker, type Job } from 'bullmq';
 import { prisma } from '../config/db';
 import { createQueueConnection } from '../config/redis';
 import { analyzeResumeAgainstJD } from '../services/aiService';
-import { getCachedAnalysis, setCachedAnalysis } from '../services/cacheService';
+import {
+  getCachedAnalysis,
+  invalidateDashboard,
+  setCachedAnalysis,
+} from '../services/cacheService';
 import { analysisCacheKey } from '../utils/hash';
 import { AiServiceError, classifyAiError } from '../utils/aiError';
 import { analysisResponseSchema, type AnalysisResponse } from '../utils/validators';
@@ -45,6 +49,30 @@ async function writeCompleted(
     update: fields,
     create: { applicationId, ...fields },
   });
+
+  /**
+   * A completed analysis changes two dashboard figures — the average match
+   * score and the aggregated skill gaps — so the cached payload is now wrong.
+   *
+   * This is the invalidation that is easiest to forget, because it happens in
+   * a different process from the request that started it. The user creates an
+   * application, the API invalidates, the dashboard is recomputed and cached,
+   * and *then*, seconds later, the worker writes a score into a snapshot that
+   * has already been taken. Without this the new score is invisible until the
+   * TTL expires.
+   *
+   * The userId is looked up rather than carried on the job. Putting it in the
+   * payload would save a query, but jobs enqueued before this change would not
+   * have it, and a primary-key lookup is not the cost worth optimising here.
+   */
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    select: { userId: true },
+  });
+
+  if (application) {
+    await invalidateDashboard(application.userId);
+  }
 }
 
 /**
