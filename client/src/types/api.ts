@@ -318,3 +318,60 @@ export interface AnalysisResult {
   createdAt: string;
   updatedAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+
+export interface DashboardSummary {
+  totalApplications: number;
+  activeApplications: number;
+  interviewsThisWeek: number;
+  /** Null when no analysis has completed yet — distinct from a score of 0. */
+  avgMatchScore: number | null;
+  offersReceived: number;
+}
+
+export interface StatusFunnelEntry {
+  status: ApplicationStatus;
+  count: number;
+}
+
+export interface MatchScoreTrendPoint {
+  /** ISO date of the Monday starting the week. */
+  week: string;
+  /** Null for a week with no completed analyses — a gap in the line, not a zero. */
+  avgScore: number | null;
+}
+
+export interface SkillGapEntry {
+  skill: string;
+  count: number;
+}
+
+export interface NeedsAttentionEntry {
+  id: string;
+  companyName: string;
+  jobTitle: string;
+  daysSinceLastUpdate: number;
+}
+
+export interface RecentActivityEntry {
+  id: string;
+  applicationId: string;
+  companyName: string;
+  jobTitle: string;
+  status: ApplicationStatus;
+  note: string | null;
+  changedAt: string;
+}
+
+/** GET /api/dashboard — the whole screen in one payload. */
+export interface DashboardPayload {
+  summary: DashboardSummary;
+  statusFunnel: StatusFunnelEntry[];
+  matchScoreTrend: MatchScoreTrendPoint[];
+  skillGapAggregation: SkillGapEntry[];
+  needsAttention: NeedsAttentionEntry[];
+  recentActivity: RecentActivityEntry[];
+}
