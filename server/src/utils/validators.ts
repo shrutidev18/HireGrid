@@ -299,6 +299,117 @@ export const listApplicationsQuerySchema = z.object({
 
 export type ListApplicationsQuery = z.infer<typeof listApplicationsQuerySchema>;
 
+// ---------------------------------------------------------------------------
+// Profile
+// ---------------------------------------------------------------------------
+
+export const EXPERIENCE_LEVELS = ['STUDENT', 'FRESHER', 'EXPERIENCED'] as const;
+
+/**
+ * PUT /api/profile
+ *
+ * Note which fields are required and which are nullable. `name` and `email`
+ * live on the User row and always have a value — the account cannot exist
+ * without them. Everything else lives on Profile, which may not exist at all
+ * yet, so every one of those fields accepts null meaning "cleared".
+ */
+export const updateProfileSchema = z.object({
+  name: z
+    .string({ error: 'Name is required' })
+    .trim()
+    .min(1, 'Name is required')
+    .max(100, 'Name must be 100 characters or fewer'),
+
+  email: z
+    .email({ error: 'Enter a valid email address' })
+    // Lower-cased for the same reason as signup: the @unique constraint
+    // compares bytes, so Shruti@x.com and shruti@x.com would otherwise be two
+    // different accounts.
+    .toLowerCase()
+    .trim(),
+
+  targetRole: optionalText(100, 'Target role'),
+  education: optionalText(200, 'Education'),
+
+  experienceLevel: z
+    .enum(EXPERIENCE_LEVELS, { error: 'Select a valid experience level' })
+    .nullish()
+    .transform((value) => value ?? null),
+
+  /**
+   * Bounded rather than "any integer".
+   *
+   * A graduation year is a small number with obvious limits, and without them
+   * a typo like 202 or 20266 is stored happily and then renders as nonsense
+   * on the profile forever. The upper bound allows a few years ahead because
+   * students apply for jobs before they graduate.
+   */
+  graduationYear: z.coerce
+    .number({ error: 'Graduation year must be a number' })
+    .int('Graduation year must be a whole number')
+    .min(1950, 'Graduation year looks too far in the past')
+    .max(new Date().getFullYear() + 10, 'Graduation year looks too far in the future')
+    .nullish()
+    .transform((value) => value ?? null),
+
+  phone: optionalText(30, 'Phone number'),
+
+  linkedinUrl: optionalUrl,
+  portfolioUrl: optionalUrl,
+
+  /**
+   * Skills are trimmed, de-duplicated case-insensitively, and capped.
+   *
+   * The de-duplication matters because this is a tag input: a user who types
+   * "React" twice, or "react" after "React", means one skill both times.
+   * Storing both would show a duplicate tag and inflate any future count. The
+   * cap on quantity and length is the same reasoning as the graduation year —
+   * a text[] column with no bound is an invitation to paste an essay.
+   */
+  skills: z
+    .array(z.string().trim().min(1).max(50, 'Each skill must be 50 characters or fewer'))
+    .max(50, 'Keep it to 50 skills or fewer')
+    .default([])
+    .transform((values) => {
+      const seen = new Set<string>();
+      const unique: string[] = [];
+
+      for (const value of values) {
+        const key = value.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(value);
+      }
+
+      return unique;
+    }),
+});
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/**
+ * PUT /api/profile/password
+ *
+ * The current password is only checked for presence, never for strength.
+ * Applying the 8-character minimum to it would reject a user whose existing
+ * password predates that rule and lock them out of changing it — the exact
+ * opposite of what this endpoint is for.
+ */
+export const changePasswordSchema = z.object({
+  currentPassword: z
+    .string({ error: 'Enter your current password' })
+    .min(1, 'Enter your current password'),
+
+  newPassword: z
+    .string({ error: 'New password is required' })
+    .min(8, 'New password must be at least 8 characters')
+    // bcrypt silently truncates past 72 bytes, so anything longer would give a
+    // false sense of strength. Same bound as signup.
+    .max(72, 'New password must be 72 characters or fewer'),
+});
+
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
 /**
  * Route parameters that carry a resource id.
  *

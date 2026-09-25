@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { prisma } from '../config/db';
-import { conflict, unauthorized } from '../utils/AppError';
-import type { LoginInput, SignupInput } from '../utils/validators';
+import { conflict, notFound, unauthorized } from '../utils/AppError';
+import type { ChangePasswordInput, LoginInput, SignupInput } from '../utils/validators';
 
 /**
  * Work factor for bcrypt. Each increment doubles the time to hash.
@@ -131,5 +131,57 @@ export async function getUserById(userId: string): Promise<PublicUser | null> {
   return prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, name: true, email: true },
+  });
+}
+
+/**
+ * Changes a signed-in user's password.
+ *
+ * Lives here, beside signup and login, rather than in profileService — so that
+ * every line in this codebase that touches bcrypt, the work factor, or a
+ * password hash is in one file. Spreading hashing across services is how one
+ * of them quietly ends up using a different cost, or storing a plaintext
+ * password, and nobody notices because the diff looked small.
+ *
+ * @throws AppError 401 if the current password does not match.
+ */
+export async function changePassword(
+  userId: string,
+  input: ChangePasswordInput,
+): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { passwordHash: true },
+  });
+
+  if (!user) {
+    throw notFound('User not found');
+  }
+
+  /**
+   * Re-verifying the current password is the whole point of this endpoint.
+   *
+   * The session cookie already proves *who* is asking, so the check adds
+   * nothing against a stolen token by itself — what it defends against is the
+   * unattended laptop and the borrowed session: someone who has the tab open
+   * but does not know the password cannot silently change it and lock the
+   * owner out. It is also why the change cannot be folded into PUT /api/profile
+   * with the rest of the form.
+   */
+  const matches = await bcrypt.compare(input.currentPassword, user.passwordHash);
+
+  if (!matches) {
+    // Specific, unlike login's deliberately vague "Invalid credentials". There
+    // is nothing to leak here: the caller is already authenticated, so telling
+    // them their current password is wrong reveals nothing they could not
+    // establish by other means, and a vague message would just be unhelpful.
+    throw unauthorized('Current password is incorrect');
+  }
+
+  const passwordHash = await bcrypt.hash(input.newPassword, SALT_ROUNDS);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash },
   });
 }

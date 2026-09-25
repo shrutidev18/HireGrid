@@ -10,6 +10,7 @@ import applicationRoutes from './routes/applications.routes';
 import resumeRoutes from './routes/resumes.routes';
 import analysisRoutes from './routes/analysis.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import profileRoutes from './routes/profile.routes';
 
 /**
  * Builds the configured Express app, without starting a server.
@@ -54,6 +55,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/resumes', resumeRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Analysis endpoints are nested under an application (/api/applications/:id/
 // analysis). Mounting a second router at the same prefix is intentional:
