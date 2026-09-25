@@ -8,11 +8,10 @@ that actually helps: it reads your resume and the job description together and
 returns a match score, the required skills you're missing, ATS keyword gaps, and
 specific suggestions for tailoring the resume to that posting.
 
-> **Status: in progress.** Authentication, application tracking with a status
-> pipeline and audit timeline, resume upload with text extraction, the
-> asynchronous AI analysis pipeline, the searchable/filterable table view and
-> the analytics dashboard are all built and working. A profile page is still to
-> come.
+> **Status: feature-complete.** Authentication, application tracking with a
+> status pipeline and audit timeline, resume upload with text extraction, the
+> asynchronous AI analysis pipeline, the searchable/filterable table view, the
+> analytics dashboard and the profile page are all built and working.
 
 ---
 
@@ -30,11 +29,13 @@ specific suggestions for tailoring the resume to that posting.
 - Identical resume + job description pairs are served from cache without a second AI call
 - Searchable, filterable, sortable table: search across company, role and location; filter by status, employment type, work mode, resume used and applied-date range; sort by company or applied date; paginated
 - Analytics dashboard: five summary figures, a status funnel, an 8-week match-score trend, aggregated skill gaps, applications going stale, and a recent-activity feed — computed in one query batch and cached in Redis per user
-- 150 automated tests
+- Profile page: personal details across two tables saved in one transaction, plus a password change that re-verifies the current password
+- 175 automated tests
 
 **Planned**
 
-- Profile page
+- Signing out other devices when a password changes (the JWT does not depend on
+  the password, so existing sessions currently survive a change)
 
 ---
 
@@ -168,6 +169,9 @@ authenticated user.
 | --- | --- | --- |
 | `GET` | `/health` | Liveness check |
 | `GET` | `/dashboard` | Every dashboard figure in one payload (cached 5 min per user) |
+| `GET` | `/profile` | Name, email and profile details merged into one object |
+| `PUT` | `/profile` | Update both tables in one transaction |
+| `PUT` | `/profile/password` | Change password, verifying the current one |
 | `POST` | `/auth/signup` | Create an account |
 | `POST` | `/auth/login` | Log in, sets the session cookie |
 | `POST` | `/auth/logout` | Clear the session cookie |
