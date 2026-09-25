@@ -75,12 +75,6 @@ export async function updateApplication(
   return data.application;
 }
 
-/**
- * Separate from `updateApplication` because it is a different operation on the
- * server: it also appends to the application's history, inside a transaction.
- * Keeping them separate here mirrors that and makes it impossible to change a
- * status by accident while editing a field.
- */
 export async function updateApplicationStatus(
   id: string,
   payload: UpdateStatusPayload,
