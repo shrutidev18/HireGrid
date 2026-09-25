@@ -375,3 +375,45 @@ export interface DashboardPayload {
   needsAttention: NeedsAttentionEntry[];
   recentActivity: RecentActivityEntry[];
 }
+
+// ---------------------------------------------------------------------------
+// Profile
+// ---------------------------------------------------------------------------
+
+export const EXPERIENCE_LEVELS = ['STUDENT', 'FRESHER', 'EXPERIENCED'] as const;
+export type ExperienceLevel = (typeof EXPERIENCE_LEVELS)[number];
+
+export const EXPERIENCE_LEVEL_LABELS: Record<ExperienceLevel, string> = {
+  STUDENT: 'Student',
+  FRESHER: 'Fresher',
+  EXPERIENCED: 'Experienced',
+};
+
+/**
+ * GET /api/profile — two database rows flattened into one object.
+ *
+ * Every optional field is `| null` rather than optional. A form bound to
+ * `undefined` renders an uncontrolled input that flips to controlled on the
+ * first keystroke, which React warns about and which loses the value.
+ */
+export interface Profile {
+  name: string;
+  email: string;
+  targetRole: string | null;
+  skills: string[];
+  education: string | null;
+  experienceLevel: ExperienceLevel | null;
+  graduationYear: number | null;
+  phone: string | null;
+  linkedinUrl: string | null;
+  portfolioUrl: string | null;
+}
+
+/** Body for PUT /api/profile — the same shape that comes back. */
+export type UpdateProfilePayload = Profile;
+
+/** Body for PUT /api/profile/password. */
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
