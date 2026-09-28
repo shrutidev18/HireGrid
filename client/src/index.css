@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* mint background shades used across the app - teal itself (teal-700/800) is
+   already a built-in Tailwind color so we don't need to redefine that */
+@theme {
+  --color-mint-bg: #EAF6F3;
+  --color-mint-sidebar: #E0F0EC;
+}

@@ -1,0 +1,16 @@
+node_modules/
+.env
+dist/
+build/
+
+# uploaded resumes - don't commit actual user files
+server/uploads/*
+!server/uploads/.gitkeep
+
+# editor/OS junk
+.DS_Store
+*.log
+
+# early phase-transport zips, not part of the actual project
+hiregrid-phase1.zip
+hiregrid-phase2.zip

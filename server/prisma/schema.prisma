@@ -1,0 +1,95 @@
+// Prisma schema for HireGrid
+// Run `npx prisma migrate dev --name init` after editing this to update the DB
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EmploymentType {
+  INTERNSHIP
+  FULL_TIME
+}
+
+enum ApplicationStatus {
+  SAVED
+  APPLIED
+  INTERVIEW
+  OFFER
+  REJECTED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+
+  resumes      Resume[]
+  applications Application[]
+}
+
+model Resume {
+  id            String   @id @default(uuid())
+  userId        String
+  fileName      String
+  fileUrl       String
+  extractedText String   @db.Text
+  createdAt     DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id])
+  applications Application[]
+}
+
+model Application {
+  id             String            @id @default(uuid())
+  userId         String
+  companyName    String
+  jobTitle       String
+  jobLocation    String
+  employmentType EmploymentType
+  jobLink        String?
+  jobDescription String            @db.Text
+  resumeId       String?
+  status         ApplicationStatus @default(SAVED)
+  dateApplied    DateTime?
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  user           User             @relation(fields: [userId], references: [id])
+  resume         Resume?          @relation(fields: [resumeId], references: [id])
+  statusHistory  StatusHistory[]
+  analysisResult AnalysisResult?
+}
+
+model StatusHistory {
+  id            String            @id @default(uuid())
+  applicationId String
+  status        ApplicationStatus
+  changedAt     DateTime          @default(now())
+
+  // Cascade so deleting an application doesn't hit a foreign key error -
+  // its status history is meaningless once the application is gone anyway.
+  // (learned this the hard way - Prisma's default here is Restrict, which
+  // blocked every single application delete since every application has
+  // at least one status history row)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}
+
+model AnalysisResult {
+  id            String   @id @default(uuid())
+  applicationId String   @unique
+  matchedSkills String[]
+  missingSkills String[]
+  matchScore    Int?
+  suggestions   String[]
+  createdAt     DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}
