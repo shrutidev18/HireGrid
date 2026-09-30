@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
-/* mint background shades used across the app - teal itself (teal-700/800) is
-   already a built-in Tailwind color so we don't need to redefine that */
+/* light blue background shades used across the app - blue itself (blue-600/700) is
+   already a built-in Tailwind color so we don't need to redefine that.
+   switched from a mint/teal theme to this blue one - kept the same two-token
+   setup, just renamed and recolored. */
 @theme {
-  --color-mint-bg: #EAF6F3;
-  --color-mint-sidebar: #E0F0EC;
+  --color-app-bg: #F2F5FE;
+  --color-app-banner: #E7EDFD;
 }

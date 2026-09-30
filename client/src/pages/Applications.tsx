@@ -32,7 +32,7 @@ export default function Applications() {
         <h1 className="text-xl font-semibold text-gray-900">Applications</h1>
         <button
           onClick={() => navigate("/applications/new")}
-          className="flex items-center gap-1.5 bg-teal-700 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-teal-800"
+          className="flex items-center gap-1.5 bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-800"
         >
           <Plus size={16} />
           Add Application
@@ -44,12 +44,12 @@ export default function Applications() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by company or role..."
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
         />
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
+          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
         >
           <option value="">All statuses</option>
           {STATUS_OPTIONS.map((s) => (
@@ -60,14 +60,14 @@ export default function Applications() {
         </select>
       </div>
 
-      <div className="bg-white rounded-2xl border border-teal-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
         {loading ? (
           <p className="text-sm text-gray-500 p-4">Loading...</p>
         ) : applications.length === 0 ? (
           <p className="text-sm text-gray-400 p-4">No applications match.</p>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-mint-bg text-left text-teal-800">
+            <thead className="bg-app-bg text-left text-blue-800">
               <tr>
                 <th className="px-4 py-3 font-medium">Company</th>
                 <th className="px-4 py-3 font-medium">Role</th>
@@ -80,7 +80,7 @@ export default function Applications() {
                 <tr
                   key={app.id}
                   onClick={() => navigate(`/applications/${app.id}`)}
-                  className="cursor-pointer hover:bg-mint-bg"
+                  className="cursor-pointer hover:bg-app-bg"
                 >
                   <td className="px-4 py-3 text-gray-900">{app.companyName}</td>
                   <td className="px-4 py-3 text-gray-700">{app.jobTitle}</td>

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Briefcase, FileText, User, Menu, X, ChevronDown, LogOut } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileText, User, Menu, X, ChevronDown, LogOut, Bell, Target } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 const NAV_ITEMS = [
@@ -35,14 +35,14 @@ export default function Layout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-mint-bg">
+    <div className="min-h-screen bg-app-bg">
       {/* sidebar - desktop only */}
-      <aside className="hidden md:flex md:flex-col md:fixed md:top-0 md:left-0 md:h-screen md:w-[220px] bg-mint-sidebar border-r border-teal-100 p-4">
+      <aside className="hidden md:flex md:flex-col md:fixed md:top-0 md:left-0 md:h-screen md:w-[220px] bg-white border-r border-gray-100 p-4">
         <div className="flex items-center gap-2 mb-8 px-2">
-          <div className="w-9 h-9 bg-teal-700 rounded-xl flex items-center justify-center text-white font-bold text-sm">
+          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm">
             HG
           </div>
-          <span className="text-lg font-semibold text-teal-900">HireGrid</span>
+          <span className="text-lg font-semibold text-gray-900">HireGrid</span>
         </div>
 
         <nav className="flex flex-col gap-1">
@@ -54,7 +54,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 key={item.to}
                 to={item.to}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium ${
-                  isActive ? "bg-teal-700 text-white" : "text-teal-900 hover:bg-teal-100"
+                  isActive ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 <Icon size={18} />
@@ -63,15 +63,27 @@ export default function Layout({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
+
+        {/* just a little tagline at the bottom so the sidebar doesn't feel empty */}
+        <div className="mt-auto px-2">
+          <div className="border-t border-gray-100 pt-4 flex items-center gap-2 text-gray-400">
+            <Target size={16} />
+            <p className="text-xs italic">
+              Small steps
+              <br />
+              build big careers.
+            </p>
+          </div>
+        </div>
       </aside>
 
       {/* top bar for mobile - has the logo + hamburger */}
-      <div className="md:hidden bg-mint-sidebar border-b border-teal-100 p-3 flex items-center justify-between">
+      <div className="md:hidden bg-white border-b border-gray-100 p-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-teal-700 rounded-lg flex items-center justify-center text-white font-bold text-xs">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-xs">
             HG
           </div>
-          <span className="font-semibold text-teal-900">HireGrid</span>
+          <span className="font-semibold text-gray-900">HireGrid</span>
         </div>
         <button onClick={() => setShowMobileNav(!showMobileNav)}>
           {showMobileNav ? <X size={22} /> : <Menu size={22} />}
@@ -79,7 +91,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </div>
 
       {showMobileNav && (
-        <div className="md:hidden bg-mint-sidebar border-b border-teal-100 px-3 pb-3 flex flex-col gap-1">
+        <div className="md:hidden bg-white border-b border-gray-100 px-3 pb-3 flex flex-col gap-1">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.to);
@@ -89,7 +101,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 to={item.to}
                 onClick={() => setShowMobileNav(false)}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium ${
-                  isActive ? "bg-teal-700 text-white" : "text-teal-900 hover:bg-teal-100"
+                  isActive ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 <Icon size={18} />
@@ -102,9 +114,15 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       {/* main column - pushed right on desktop to make room for the fixed sidebar */}
       <div className="md:ml-[220px]">
-        <div className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-end relative">
+        <div className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-end gap-4 relative">
+          {/* just a static bell icon to match the reference layout - no notifications
+              system in this app yet, so it doesn't have a dropdown or unread count */}
+          <button className="text-gray-400 hover:text-gray-600">
+            <Bell size={20} />
+          </button>
+
           <button onClick={() => setShowMenu(!showMenu)} className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center text-sm font-semibold">
+            <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-semibold">
               {initials}
             </div>
             <span className="text-sm font-medium text-gray-700">{user?.name}</span>

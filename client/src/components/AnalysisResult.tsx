@@ -2,12 +2,12 @@ import type { AnalysisResult as AnalysisResultType } from "../types";
 
 export default function AnalysisResult({ analysis }: { analysis: AnalysisResultType }) {
   return (
-    <div className="bg-white rounded-2xl border border-teal-100 shadow-sm p-6 mt-4">
+    <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-gray-900">AI Resume Match</h2>
         {analysis.matchScore !== null && (
-          <div className="w-16 h-16 rounded-full border-4 border-teal-700 flex items-center justify-center">
-            <span className="text-lg font-bold text-teal-800">{analysis.matchScore}</span>
+          <div className="w-16 h-16 rounded-full border-4 border-blue-700 flex items-center justify-center">
+            <span className="text-lg font-bold text-blue-800">{analysis.matchScore}</span>
           </div>
         )}
       </div>

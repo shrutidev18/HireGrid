@@ -57,102 +57,109 @@ export default function ApplicationDetails() {
   }
 
   return (
-    <div className="max-w-2xl">
-      <div className="bg-white rounded-2xl border border-teal-100 shadow-sm p-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">{application.jobTitle}</h1>
-            <p className="text-gray-500">{application.companyName}</p>
+    <div className="max-w-6xl">
+      {/* two equal-width columns: job info on the left, AI match + status
+          history stacked on the right. single column on small screens. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">{application.jobTitle}</h1>
+              <p className="text-gray-500">{application.companyName}</p>
+            </div>
+            <StatusBadge status={application.status} />
           </div>
-          <StatusBadge status={application.status} />
-        </div>
 
-        <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-          <div>
-            <span className="text-gray-400">Location</span>
-            <p className="text-gray-800">{application.jobLocation}</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 text-sm">
+            <div>
+              <span className="text-gray-400">Location</span>
+              <p className="text-gray-800">{application.jobLocation}</p>
+            </div>
+            <div>
+              <span className="text-gray-400">Type</span>
+              <p className="text-gray-800">
+                {application.employmentType === "INTERNSHIP" ? "Internship" : "Full-time"}
+              </p>
+            </div>
+            <div>
+              <span className="text-gray-400">Date applied</span>
+              <p className="text-gray-800">
+                {application.dateApplied ? new Date(application.dateApplied).toLocaleDateString() : "-"}
+              </p>
+            </div>
+            <div>
+              <span className="text-gray-400">Resume</span>
+              <p className="text-gray-800">{application.resume?.fileName || "-"}</p>
+            </div>
           </div>
-          <div>
-            <span className="text-gray-400">Type</span>
-            <p className="text-gray-800">
-              {application.employmentType === "INTERNSHIP" ? "Internship" : "Full-time"}
-            </p>
-          </div>
-          <div>
-            <span className="text-gray-400">Date applied</span>
-            <p className="text-gray-800">
-              {application.dateApplied ? new Date(application.dateApplied).toLocaleDateString() : "-"}
-            </p>
-          </div>
-          <div>
-            <span className="text-gray-400">Resume</span>
-            <p className="text-gray-800">{application.resume?.fileName || "-"}</p>
-          </div>
-        </div>
 
-        {application.jobLink && (
-          <a
-            href={application.jobLink}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-teal-700 hover:underline block mt-3"
-          >
-            View job posting
-          </a>
-        )}
+          {application.jobLink && (
+            <a
+              href={application.jobLink}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-blue-700 hover:underline block mt-3"
+            >
+              View job posting
+            </a>
+          )}
 
-        <div className="mt-4">
-          <span className="text-sm text-gray-400">Job description</span>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap mt-1">{application.jobDescription}</p>
-        </div>
-
-        {application.notes && (
           <div className="mt-4">
-            <span className="text-sm text-gray-400">Notes</span>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap mt-1">{application.notes}</p>
+            <span className="text-sm text-gray-400">Job description</span>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap mt-1">{application.jobDescription}</p>
           </div>
-        )}
 
-        <div className="mt-6 flex items-center gap-2">
-          <span className="text-sm text-gray-500">Change status:</span>
-          <select
-            value={application.status}
-            disabled={changingStatus}
-            onChange={(e) => handleStatusChange(e.target.value as ApplicationStatus)}
-            className="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          {application.notes && (
+            <div className="mt-4">
+              <span className="text-sm text-gray-400">Notes</span>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap mt-1">{application.notes}</p>
+            </div>
+          )}
+
+          <div className="mt-6 flex items-center gap-2">
+            <span className="text-sm text-gray-500">Change status:</span>
+            <select
+              value={application.status}
+              disabled={changingStatus}
+              onChange={(e) => handleStatusChange(e.target.value as ApplicationStatus)}
+              className="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mt-6 flex gap-3">
+            <button
+              onClick={() => navigate(`/applications/${application.id}/edit`)}
+              className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50"
+            >
+              <Pencil size={14} />
+              Edit
+            </button>
+            <button
+              onClick={handleDelete}
+              className="flex items-center gap-1.5 text-sm border border-red-200 text-red-600 rounded-lg px-3 py-1.5 hover:bg-red-50"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+          </div>
         </div>
 
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={() => navigate(`/applications/${application.id}/edit`)}
-            className="flex items-center gap-1.5 text-sm border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50"
-          >
-            <Pencil size={14} />
-            Edit
-          </button>
-          <button
-            onClick={handleDelete}
-            className="flex items-center gap-1.5 text-sm border border-red-200 text-red-600 rounded-lg px-3 py-1.5 hover:bg-red-50"
-          >
-            <Trash2 size={14} />
-            Delete
-          </button>
+        {/* right column: AI Resume Match on top (if there's an analysis to
+            show), Status History stacked below it */}
+        <div className="space-y-4">
+          {application.analysisResult && <AnalysisResult analysis={application.analysisResult} />}
+          <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-6">
+            <h2 className="font-semibold text-gray-900 mb-3">Status History</h2>
+            <StatusHistoryList history={application.statusHistory || []} />
+          </div>
         </div>
       </div>
-
-      <div className="bg-white rounded-2xl border border-teal-100 shadow-sm p-6 mt-4">
-        <h2 className="font-semibold text-gray-900 mb-3">Status History</h2>
-        <StatusHistoryList history={application.statusHistory || []} />
-      </div>
-
-      {application.analysisResult && <AnalysisResult analysis={application.analysisResult} />}
     </div>
   );
 }

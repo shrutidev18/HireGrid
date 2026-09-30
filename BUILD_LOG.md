@@ -247,3 +247,199 @@ Rewrote `README.md` with an actual problem statement, a features list, the tech 
 
 - Neither Dockerfile has been build-tested for real (see "Errors hit" above) - they're written correctly as far as I can tell from reading them closely, but an actual `docker build` might still turn up something I didn't catch by eye.
 - Haven't set `binaryTargets` in `schema.prisma`. Shouldn't be needed since `prisma generate` runs inside the container itself during the Docker build (so it always generates for the container's own platform), but flagging it in case the deployed container ever throws a "query engine not found" error - that's the first thing to check.
+
+## Login / Signup Redesign
+
+Not a numbered phase - reworked the Login and Signup pages after being sent a new reference design for them (split card: colored branding panel on the left, the actual form on the right). Everything else (Dashboard, Applications, sidebar, etc.) is untouched.
+
+### What was built
+
+Both pages are now a single white card split into two halves. Left half is a `bg-teal-800` panel with the HireGrid logo mark, a headline ("Welcome Back!" / "Create Account"), a short description, and two faint decorative circles (just absolutely positioned divs with low-opacity white backgrounds, clipped by `overflow-hidden` on the panel - no image, no SVG, nothing fancy). Right half is the actual form, now with a small icon inside each input (email/lock/person icons from `lucide-react`, same library already used elsewhere in the app) and a show/hide toggle on the password field (a plain `useState` boolean, nothing more complex than that). Stacks to a single column on small screens using `flex-col md:flex-row`, same responsive approach used everywhere else in the app.
+
+Left out the "Learn more" button that was in the reference image - there's no marketing/about page in this app for it to link to, so a button that goes nowhere would've been worse than just not having it.
+
+### Libraries introduced
+
+- None - reused `lucide-react`, which was already a dependency from the earlier UI restyle.
+
+### What to manually verify
+
+1. Go to `/login` and `/signup` - confirm both show the new split-card layout instead of the old centered-card one.
+2. Click the eye icon in the password field - confirm it actually toggles between hidden and visible text.
+3. Shrink the browser (or check on your phone) - confirm the branding panel stacks on top of the form instead of squishing side by side.
+4. Confirm logging in / signing up still works exactly as before - this was meant to be visual only, no logic changed.
+
+**Confirmed working in my own test environment** (screenshots at desktop and mobile widths, and a scripted check that the password toggle actually flips the input type) for all of the above.
+
+## Add Application Page Redesign
+
+Not a numbered phase - restyled the Add/Edit Application form after being sent a reference design for it (icon-prefixed fields, a small section header inside the card, a tips sidebar). No backend changes, no changes to what data gets sent or how - purely visual, same form fields and same submit logic as before.
+
+### What was built
+
+Added a small "Job Details" header inside the form card (icon + title + one-line description) so the card doesn't just start cold with a label. Every field now has a small icon inside it on the left (building/briefcase/pin/etc. from `lucide-react`, matching the pattern already used on the Login/Signup pages), and the 2-column field rows now collapse to 1 column on small screens (`grid-cols-1 sm:grid-cols-2`) - the old version didn't do this. Job description textarea got a `maxLength={2000}` and a small `0/2000` character counter underneath, matching the reference. Added a static "Quick Tips" card next to the form on wider screens (stacks below it on mobile) - just a plain checklist, no logic, so the page doesn't feel so empty next to the form.
+
+Left the Resume field as a dropdown of already-uploaded resumes (same as before) instead of turning it into an actual drag-and-drop uploader like the reference image showed - resumes are uploaded separately on the Resumes page in this app, and building real drag-and-drop upload into this form would've been a much bigger change than "make it look nicer," so I just gave the existing dropdown the same icon treatment as everything else instead.
+
+### Libraries introduced
+
+- None - more icons from `lucide-react`, already a dependency.
+
+### What to manually verify
+
+1. Go to `/applications/new` - confirm the new layout shows up (icons in fields, Job Details header, Quick Tips sidebar).
+2. Fill out and submit a new application - confirm it still saves correctly and behaves exactly like before (this was meant to be visual only).
+3. Edit an existing application - confirm the same layout shows there too and the fields still prefill correctly.
+4. Shrink the browser - confirm the 2-column field rows stack to one column, and the tips card moves below the form instead of squishing beside it.
+
+**Confirmed working in my own test environment** (screenshots at desktop and mobile widths) for the layout itself. Did not re-verify the actual submit/save behavior since none of that logic was touched.
+
+## My Resumes Page Redesign
+
+Not a numbered phase - restyled the Resumes page after being sent a reference design for it (dropzone at the top, uploaded list below with file icons and download/delete buttons). No backend changes.
+
+### What was built
+
+The old upload box was a plain file picker with a separate "Upload" button. Replaced it with a real drag-and-drop dropzone (`onDragOver` / `onDragLeave` / `onDrop` handlers, just plain `useState` for the dragging/hover state - no new library) that also still works by clicking to browse. It uploads automatically the moment a file is dropped or picked, so there's no separate "confirm" step anymore - simpler than before. Same PDF-type and 5MB size checks as before, just moved earlier so they run right when a file is picked/dropped instead of on a button click.
+
+Below the dropzone, the resume list now shows a small file icon per row, the upload date plus a relative "X days/weeks ago" text (a small local `timeAgo()` helper, plain JS, no date library), and a working Download link next to Delete. Also added a small count badge next to the "My Resumes" heading when there's at least one resume.
+
+A couple of things in the reference image don't match what this app actually does, so I adjusted rather than faking it:
+- The reference said "PDF or Word (.docx)" - the backend's upload route only accepts PDFs (checked `resumes.routes.ts`, the multer filter rejects anything else), so the copy here still just says "PDF only, up to 5MB".
+- The reference had a "Last uploaded" sort dropdown - there's no sort parameter on the resumes API, so I left that out instead of adding a dropdown that doesn't actually do anything.
+- The reference showed a file size next to each resume - the `Resume` type returned by the API doesn't include a size field, so rather than make up a number I left it off entirely.
+- Download links needed a fix beyond just styling: the backend returns `fileUrl` as a relative path (e.g. `/uploads/xyz.pdf`), which only works because frontend and backend share an origin in local dev. Once they're on separate domains (Render + Vercel), a plain `<a href={resume.fileUrl}>` would point at the frontend's own domain and 404. Fixed by building the full URL from `VITE_API_URL` (stripping the trailing `/api`) instead of using the relative path directly.
+
+### Libraries introduced
+
+- None - `lucide-react` again (FileText, Download icons), already a dependency.
+
+### What to manually verify
+
+1. Go to `/resumes` - confirm the new dropzone shows up, and dragging a PDF over it highlights the border.
+2. Drop a PDF onto it (or click to browse and pick one) - confirm it uploads immediately without needing a separate upload button click.
+3. Try dropping a non-PDF or an oversized file - confirm the same error messages as before still show up.
+4. Confirm the Download link on an existing resume actually opens/downloads the file, especially once this is live (frontend and backend on separate domains) - this is the part I couldn't fully test in my own environment since it doesn't have the production URLs.
+5. Delete a resume - confirm it still asks for confirmation and removes it from the list.
+
+**Confirmed working in my own test environment** for the dropzone and list layout (screenshots at desktop and mobile widths, empty state and a populated state). Could not verify the Download link against the real production URLs from that environment - worth clicking Download on the actual live site once it's deployed.
+
+## Profile Page Redesign
+
+Not a numbered phase - reworked the Profile page after being sent a reference design for it (two-column layout: a bigger form on the left grouped into sections, a "Profile Completion" progress ring and a tips card on the right). Unlike the earlier redesigns, this one needed real backend changes, not just styling - the reference has fields (target role, experience level, education, skills) that the User table didn't have at all before this.
+
+### What was built
+
+**Database:** Added five new columns to `User` - `targetRole`, `experienceLevel`, `education`, `graduationYear`, and `skills` (a string array) - all optional, since these are things you fill in after signing up, not required to have an account. Added the migration by hand in `prisma/migrations/20260103000000_add_profile_fields/` since `prisma migrate dev` needs to reach Prisma's own servers to download its schema-engine binary, and that was blocked wherever I tried to run it (same kind of network restriction that blocked `docker build` earlier - see the Deployment Prep section above).
+
+**Backend:** `GET /api/profile` and `PUT /api/profile` now read/write all five new fields alongside name and email. Password change is untouched.
+
+**Frontend:** The page is now two columns. Left side is one "Personal Information" card split into labelled sections - Account (name, email - kept the note that email is what you sign in with), Career (target role, a dropdown for experience level), Education (education, graduation year), and Skills (type a skill and hit Enter to add it as a removable chip, similar pattern to how job descriptions/tags work elsewhere). One "Save Changes" button saves everything at once. The password-change form is still there, just restyled to match, as its own card below. Right side has a "Profile Completion" card with a percentage ring (drawn by hand with plain SVG - no charting library) and a checklist, and a static "Pro Tip" card underneath.
+
+The completion percentage and checklist are based on real data already on the page - Personal Information is always checked since name/email are required to have an account, Career/Education/Skills check whether you've actually filled those fields in, and Resume Upload checks whether you have at least one resume (reuses the same `getResumes()` call as the Resumes page). Nothing here is a fake/decorative number.
+
+The reference image's version of this page had some copy that doesn't apply to this app - it said filled-in details help "recruiters understand your background", but HireGrid is a personal tracker, nothing here is ever shown to anyone else, so I wrote different copy that's actually true for what this app does.
+
+### Libraries introduced
+
+- None - more icons from `lucide-react`. The completion ring is plain SVG (`stroke-dasharray`/`stroke-dashoffset`), no charting library.
+
+### Errors hit and fixed
+
+- Couldn't run `npx prisma migrate dev` or even `npx prisma generate` in either of my test environments - both need to download Prisma's schema-engine binary first, and that download was blocked (403) in one environment and just hung with no response in the other. Wrote the migration SQL by hand instead (it's a straightforward `ALTER TABLE ... ADD COLUMN`, nothing fancy) and updated `schema.prisma` directly. This means the new Prisma Client types (the `targetRole` etc. fields on `prisma.user`) have **not** been verified with `tsc` the way everything else in this project has been - see below for what to run to confirm this compiles for real.
+
+### What to manually verify
+
+1. Make sure Postgres is running (`docker compose up -d` from the project root if it isn't already).
+2. `cd server && npx prisma migrate dev` - this should pick up the new `20260103000000_add_profile_fields` migration, apply it, and regenerate the Prisma Client. Confirm it doesn't ask you to reset the database or complain about drift (it shouldn't, since this is a clean additive migration).
+3. `cd server && npx tsc --noEmit` - confirm this comes back clean. This is the one file in this whole project I couldn't verify myself because of the network issue above, so it's worth double-checking here specifically.
+4. Restart the backend (`npm run dev` in `server/`) so it picks up the new Prisma Client.
+5. Go to `/profile` - fill in target role, experience level, education, graduation year, and a couple of skills, then hit Save Changes. Refresh the page and confirm everything you entered is still there (confirms it actually round-trips through the database, not just local state).
+6. Watch the Profile Completion ring and checklist update as you fill in each section, and upload a resume on the Resumes page to confirm the "Resume Upload" item ticks too.
+7. Confirm the password change form at the bottom still works exactly as before - that logic wasn't touched.
+8. Shrink the browser - confirm the two-column layout stacks (sidebar below the form) on smaller screens.
+
+**Confirmed working in my own test environment**: the frontend (screenshots not taken this time, but `tsc` passed clean against the full new component). **Not confirmed**: the backend/database side, since I couldn't reach a real Postgres instance or regenerate the Prisma Client from either of my environments - steps 1-3 above are the ones to actually run before trusting this.
+
+## App-wide Retheme (teal -> blue)
+
+Not a numbered phase - restyled the whole app from the mint/teal color scheme to a blue one, after being sent a reference dashboard design. Purely a UI pass - no backend routes, API calls, or data logic were touched, and every page still does exactly what it did before.
+
+### What was built
+
+Renamed the two custom background tokens in `index.css` from `mint-bg`/`mint-sidebar` to `app-bg`/`app-banner` and recolored them to a light blue instead of mint. Then swapped every `teal-*` Tailwind class to the matching `blue-*` shade across all pages and components (buttons, borders, focus rings, badges, etc.) - same shades, same usage, just a different hue.
+
+On top of that plain color swap, a few things needed restructuring to actually match the reference layout instead of just recoloring in place:
+
+- **Sidebar** (`Layout.tsx`): was a solid mint-tinted panel with a filled teal pill for the active nav item. Now it's a plain white sidebar with a soft light-blue highlight behind the active item (text + icon turn blue, background stays a light `blue-50`) instead of a solid fill - matches how the reference does it. Added a small italic tagline ("Small steps build big careers.") at the bottom of the sidebar with a plain lucide icon next to it. Skipped the illustrated mountain/flag graphic from the reference - same call I made on the Add Application page before, hand-drawn illustration work reads as too polished for this kind of project, so text-only.
+- **Top bar** (`Layout.tsx`): added a bell icon next to the profile menu to match the reference's layout. It's just a static icon - there's no notifications feature in this app, so it doesn't have a dropdown, a count, or a red dot (a dot would imply an unread notification that doesn't exist). The avatar circle went from a soft light-blue circle to a solid indigo one with white initials, matching the reference.
+- **Dashboard stat cards**: kept the same 4 cards (Applications/Active/Interviews/Offers) with the same real numbers, just remapped each card's accent color to match the reference (Active is now green, Interviews is purple, Offers is red, Applications stays blue).
+- **Quick Actions**: added a small colored icon badge next to each action (blue/green/red squares) instead of a plain icon, matching the reference's style.
+
+Everything else - Login/Signup, Applications table, Application Details, Resumes, Profile, all the AI analysis / status history bits - kept its exact existing layout and only had its colors swapped.
+
+### What I didn't add
+
+The reference dashboard also had an "Avg Match" stat card and a "Match Score Trend" chart, both of which need the dashboard's backend route to compute an average/weekly breakdown of match scores across applications - real data, but not currently returned by `GET /api/dashboard`. Asked first since that's backend work, not styling, and was told to skip both and keep this pass UI-only. So the dashboard still has 4 stat cards and 1 chart, not 5 and 2, like it already did before this pass.
+
+Also left the sidebar nav as Dashboard/Applications/Resumes/Profile - the reference had an "Interviews" nav item, but there's no interview-tracking page in this app (interview is just one of the 5 application statuses), so I didn't invent a nav link to a page that doesn't exist.
+
+### Libraries introduced
+
+- None - same `lucide-react` icons already used everywhere (added `Bell` and `Target` for the new sidebar/topbar bits).
+
+### What to manually verify
+
+1. Click through every page (Dashboard, Applications, an application's details, Resumes, Profile, Login, Signup) and confirm nothing looks broken - this was a big find-and-replace across every file, so it's worth a full click-through.
+2. Confirm the sidebar's active-page highlight still shows correctly as you navigate between pages.
+3. Shrink the browser and check the mobile nav (hamburger menu) still opens/closes and highlights the active page the same way.
+4. Confirm all the existing functionality (adding/editing applications, changing status, uploading/deleting resumes, editing profile, changing password) still works exactly as before - none of that logic was touched, only class names.
+
+**Confirmed working in my own test environment**: screenshots of the Dashboard (desktop + mobile, with seeded fake data since I don't have a live database there) and Login/Signup came out matching the reference closely. Didn't re-screenshot every single page since this was a mechanical color swap almost everywhere else, but did confirm `tsc` passes clean across the whole client.
+
+## Layout Follow-ups (empty space + Quick Tips sidebars)
+
+Not a numbered phase - a few small layout fixes after the retheme, based on feedback that some pages looked too empty on the right side once the sidebar/content areas got wider. Still UI only, nothing backend touched.
+
+### What was built
+
+- **Application Details page width**: was capped at `max-w-2xl`, which left a big empty gap on wider screens. Widened it in two steps - first to `max-w-4xl` with the top info grid changed from 2 columns to 4 (`grid-cols-2 sm:grid-cols-4`) so Location/Type/Date Applied/Resume sit in one row instead of stacking oddly, then to `max-w-6xl` as part of the two-column change below.
+- **Application Details - Status History and AI Resume Match side by side**: these used to stack vertically with the AI match card at the very bottom. Restructured into a two-column grid (`grid-cols-1 sm:grid-cols-2`) so they sit next to each other and are equal height (`items-stretch` on the grid, `h-full` on both cards) when there's an AI match to show. If there's no resume analysis yet, Status History just takes the full row by itself instead of leaving an empty second column next to it - didn't want to show a blank box where the AI match would go.
+- **Quick Tips sidebar added to Application Details and My Resumes**: same pattern already used on Add Application and Profile - a `Lightbulb` icon header and a short bulleted list of genuinely useful tips for that page, in a card on the right (`w-full lg:w-72`, stacks below the main content on small screens). Both pages went from a single wide column to a `flex-col lg:flex-row` layout with the existing content in a `flex-1` column and this sidebar next to it, which is also what filled the empty right-side space on My Resumes. The tips themselves are specific to each page (e.g. Application Details mentions updating status and attaching a resume for AI matching; My Resumes mentions the PDF/5MB limit and deleting old resumes) - didn't reuse the same generic list everywhere.
+
+### Libraries introduced
+
+- None - just the `Lightbulb` and `CheckCircle2` icons from `lucide-react`, already used elsewhere for this same sidebar pattern.
+
+### What to manually verify
+
+1. Go to an application that has an AI resume match - confirm Status History and AI Resume Match now sit side by side and look the same height, on both a wide screen and a narrow one (should stack on mobile).
+2. Go to an application with no resume/analysis yet - confirm Status History still shows full-width and there's no empty box next to it.
+3. Go to `/applications/:id` in general and to `/resumes` - confirm neither page has a big empty gap on the right anymore, and the new Quick Tips card shows up next to the main content (below it on mobile).
+4. Confirm nothing about editing/deleting applications, changing status, or uploading/deleting resumes changed - this was layout only.
+
+**Confirmed working in my own test environment**: screenshots of Application Details (both with and without an AI match) and My Resumes (desktop + mobile, seeded fake data) all matched what was expected, and `tsc -b` passed clean on the client both times.
+
+## Application Details - two-column rework
+
+Not a numbered phase - another layout pass on the Application Details page, on top of the "Layout Follow-ups" changes above. UI only, no data/logic/API changes.
+
+### What was built
+
+- **Removed the Quick Tips card.** It had only just been added in the previous pass, but the page needed the room for a proper two-column layout instead.
+- **Changed to two equal-width columns** (`grid grid-cols-1 lg:grid-cols-2 gap-6`, single column on small screens): left column is the job info card (title, company, status badge, location/type/date/resume grid, job link, description, notes, status dropdown, edit/delete buttons) exactly as before, just no longer wrapped in a `flex-1` div. Right column now holds AI Resume Match on top and Status History stacked directly below it (`space-y-4`), instead of the two sitting side by side in their own row underneath the job info.
+- **AI Resume Match card**: dropped the `h-full` class in `AnalysisResult.tsx` that was added last pass to make it match Status History's height in a side-by-side grid - now that they're stacked in the same column instead of side by side, `h-full` isn't needed and was making the div stretch oddly, so removed it and left it a normal auto-height card.
+- When there's no resume analysis yet, the right column just shows Status History on its own (same as before) - the AI Resume Match card simply doesn't render, nothing fakes an empty state for it.
+
+### Libraries introduced
+
+- None.
+
+### What to manually verify
+
+1. Open an application that has an AI resume match - confirm the page is two equal columns on a wide screen (job info left, AI Resume Match on top of Status History on the right), and confirm the Quick Tips card is gone.
+2. Open an application with no resume analysis yet - confirm the right column shows only Status History, sized normally (no weird stretching now that `h-full` was removed).
+3. Shrink the browser - confirm it drops to a single stacked column: job info, then AI Resume Match (if present), then Status History.
+4. Confirm editing, deleting, and changing status still all work exactly as before - none of that logic was touched.
+
+**Confirmed working in my own test environment**: screenshots of both the with-analysis and without-analysis states at desktop width, and the with-analysis state at mobile width, all matched what was expected. `tsc -b` passed clean on the client.

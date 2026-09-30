@@ -37,11 +37,11 @@ export default function Dashboard() {
 
   if (!data || data.totalApplications === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-teal-100 shadow-sm p-10 text-center">
+      <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-10 text-center">
         <p className="text-gray-500">You haven't added any applications yet.</p>
         <button
           onClick={() => navigate("/applications/new")}
-          className="mt-4 bg-teal-700 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-teal-800"
+          className="mt-4 bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-800"
         >
           Add your first application
         </button>
@@ -65,21 +65,21 @@ export default function Dashboard() {
       value: activeCount,
       caption: "still in play",
       icon: Zap,
-      color: "bg-teal-100 text-teal-700",
+      color: "bg-green-100 text-green-600",
     },
     {
       label: "Interviews",
       value: data.statusCounts.INTERVIEW,
       caption: "active this week",
       icon: Users,
-      color: "bg-orange-100 text-orange-600",
+      color: "bg-purple-100 text-purple-600",
     },
     {
       label: "Offers",
       value: data.statusCounts.OFFER,
       caption: "received",
       icon: Gift,
-      color: "bg-green-100 text-green-600",
+      color: "bg-red-100 text-red-600",
     },
   ];
 
@@ -89,12 +89,12 @@ export default function Dashboard() {
   return (
     <div>
       {/* welcome banner */}
-      <div className="bg-mint-sidebar rounded-2xl border border-teal-100 p-6 mb-6 flex items-center justify-between">
+      <div className="bg-app-banner rounded-2xl border border-blue-100 p-6 mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">👋 Welcome back, {user?.name}!</h1>
           <p className="text-sm text-gray-600 mt-1">Here's what's happening with your job search today.</p>
         </div>
-        <p className="hidden sm:block text-sm text-teal-800 italic text-right">
+        <p className="hidden sm:block text-sm text-blue-800 italic text-right">
           Keep going.
           <br />
           great opportunities are on the way!
@@ -106,7 +106,7 @@ export default function Dashboard() {
         {statCards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.label} className="bg-white rounded-2xl border border-teal-100 shadow-sm p-5">
+            <div key={card.label} className="bg-white rounded-2xl border border-blue-100 shadow-sm p-5">
               <div className={`w-9 h-9 rounded-full flex items-center justify-center mb-3 ${card.color}`}>
                 <Icon size={18} />
               </div>
@@ -120,7 +120,7 @@ export default function Dashboard() {
 
       {/* bar chart + quick actions/recent activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-teal-100 shadow-sm p-6">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-blue-100 shadow-sm p-6">
           <h2 className="font-semibold text-gray-900">Where your applications stand</h2>
           <p className="text-xs text-gray-400 mb-4">Applications at each stage</p>
 
@@ -133,7 +133,7 @@ export default function Dashboard() {
                   <span className="w-24 text-gray-500">{status}</span>
                   <div className="flex-1 bg-gray-100 rounded-full h-3">
                     <div
-                      className="bg-teal-700 h-3 rounded-full"
+                      className="bg-blue-700 h-3 rounded-full"
                       style={{ width: `${widthPercent}%` }}
                     />
                   </div>
@@ -145,35 +145,41 @@ export default function Dashboard() {
         </div>
 
         <div className="flex flex-col gap-4">
-          <div className="bg-white rounded-2xl border border-teal-100 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-5">
             <h2 className="font-semibold text-gray-900 mb-3">Quick Actions</h2>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1">
               <button
                 onClick={() => navigate("/applications")}
-                className="flex items-center justify-between px-3 py-2 rounded-lg text-sm text-teal-900 hover:bg-teal-50"
+                className="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
-                <span className="flex items-center gap-2">
-                  <Briefcase size={16} />
+                <span className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center">
+                    <Briefcase size={14} />
+                  </span>
                   View Applications
                 </span>
                 <ChevronRight size={16} className="text-gray-400" />
               </button>
               <button
                 onClick={() => navigate("/resumes")}
-                className="flex items-center justify-between px-3 py-2 rounded-lg text-sm text-teal-900 hover:bg-teal-50"
+                className="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
-                <span className="flex items-center gap-2">
-                  <Users size={16} />
+                <span className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-md bg-green-100 text-green-600 flex items-center justify-center">
+                    <Users size={14} />
+                  </span>
                   Manage Resumes
                 </span>
                 <ChevronRight size={16} className="text-gray-400" />
               </button>
               <button
                 onClick={() => navigate("/applications/new")}
-                className="flex items-center justify-between px-3 py-2 rounded-lg text-sm text-teal-900 hover:bg-teal-50"
+                className="flex items-center justify-between px-2 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
-                <span className="flex items-center gap-2">
-                  <Gift size={16} />
+                <span className="flex items-center gap-2.5">
+                  <span className="w-7 h-7 rounded-md bg-red-100 text-red-600 flex items-center justify-center">
+                    <Gift size={14} />
+                  </span>
                   Add Application
                 </span>
                 <ChevronRight size={16} className="text-gray-400" />
@@ -181,7 +187,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-teal-100 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-blue-100 shadow-sm p-5">
             <h2 className="font-semibold text-gray-900 mb-3">Recent Activity</h2>
             <ul className="space-y-3">
               {data.recentApplications.slice(0, 5).map((app) => (
@@ -190,7 +196,7 @@ export default function Dashboard() {
                   onClick={() => navigate(`/applications/${app.id}`)}
                   className="flex items-start gap-2 text-sm cursor-pointer"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-teal-700 mt-1.5 shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-700 mt-1.5 shrink-0" />
                   <div className="flex-1">
                     <p className="text-gray-700">
                       {app.companyName} application <StatusBadge status={app.status} />
