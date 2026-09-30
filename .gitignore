@@ -11,6 +11,3 @@ server/uploads/*
 .DS_Store
 *.log
 
-# early phase-transport zips, not part of the actual project
-hiregrid-phase1.zip
-hiregrid-phase2.zip
