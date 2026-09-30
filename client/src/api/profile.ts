@@ -3,6 +3,11 @@ import { apiClient } from "./client";
 export interface ProfileData {
   name: string;
   email: string;
+  targetRole: string | null;
+  experienceLevel: string | null;
+  education: string | null;
+  graduationYear: number | null;
+  skills: string[];
 }
 
 export async function getProfile() {

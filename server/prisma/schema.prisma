@@ -30,6 +30,14 @@ model User {
   name         String
   createdAt    DateTime @default(now())
 
+  // career info for the profile page - all optional since these are
+  // filled in after signup, not required to have an account
+  targetRole      String?
+  experienceLevel String?
+  education       String?
+  graduationYear  Int?
+  skills          String[] @default([])
+
   resumes      Resume[]
   applications Application[]
 }
